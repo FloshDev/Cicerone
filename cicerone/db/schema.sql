@@ -30,6 +30,7 @@ CREATE TABLE Sheet (
       idAssessment           INTEGER PRIMARY KEY,
       sheet_id               INTEGER NOT NULL REFERENCES Sheet(idSheet),
       framework_vincitore_id INTEGER REFERENCES Framework(idFramework),
+      contesto_azienda       TEXT,
       ts                     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
