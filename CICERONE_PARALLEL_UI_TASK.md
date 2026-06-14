@@ -501,6 +501,112 @@ lavoro.
 
 ---
 
+## ROUND 4 — fix post-demo 2 (2026-06-15, notte)
+
+Demo 2 fatta. Round 3 fixato la maggior parte ma sono emersi 3 nuovi
+problemi lato UI/UX. Backend sta lavorando in parallelo su fix diagnostica
+e intervista — NON toccare `cicerone/llm/`.
+
+### Fix da fare (solo UI in `cicerone/ui/app.py` + style.css)
+
+#### 1. Sidebar fasi cliccabili (navigazione)
+
+Attualmente le fasi nella sidebar sono solo label visuali. Renderle
+cliccabili così l'utente può tornare indietro alle schede precedenti per
+rivedere quello che ha fatto.
+
+Regole:
+- Cliccabile SOLO se la fase è stata già raggiunta o è quella corrente
+  (no salti in avanti su fasi non ancora attive)
+- Click → cambia `st.session_state.step` + `st.rerun()`
+- Visualmente: cursor pointer + hover leggero ambrato per le fasi
+  disponibili; grigio per quelle non ancora sbloccate
+- Quando si torna indietro, le pagine precedenti devono mostrare lo
+  STATO già compilato (il DB lo persiste, leggi via repository):
+  - Onboarding: pre-riempire campi da `st.session_state.contesto_azienda`
+  - Intervista: già supportato via `repo.get_pesi_assessment` (vedi
+    codice esistente che usa `precompilato`)
+  - Vincitore: ricalcola sempre, è view-only
+  - Diagnostica: già mostra storia Q&A via `repo.storia_diagnostica`
+  - Report: usa `st.session_state.report_markdown` se già generato
+
+Per sapere quali fasi sono "sbloccate", traccia in session_state:
+```python
+st.session_state.setdefault("fasi_raggiunte", {"onboarding"})
+# Aggiungi a fasi_raggiunte ogni volta che si passa a un nuovo step
+```
+
+Implementa come bottoni Streamlit (non markdown) per gestire il click:
+`st.sidebar.button(label, key=..., disabled=not raggiunta)`. Puoi
+stilarli via CSS custom per integrarli nel design (numero romano +
+label).
+
+#### 2. Spinner di caricamento centrato e visibile
+
+Gli spinner attuali (`st.spinner`) sono piccoli e poco visibili. Per le
+attese LLM (intervista, diagnostica, report) servono spinner più
+prominenti.
+
+Opzioni:
+- Usa `st.spinner` con messaggio chiaro + un blocco `st.empty()` /
+  overlay CSS che centra un loader animato (SVG inline o CSS pure
+  spinner) nel mezzo della pagina
+- Oppure usa `st.status(..., expanded=True)` che mostra un container
+  con animazione + log step
+- Considera componente `streamlit_extras` se già nel progetto, altrimenti
+  resta su CSS puro (no nuove deps)
+
+Stile: cerchio ambrato `#E8B84B` rotante su sfondo semi-trasparente,
+testo italico sotto con messaggio contestuale. Coerente con identità
+Cicerone (sobrio, no caricature).
+
+#### 3. Pagina "Framework vincitore" — titoli leggibili
+
+Bug visibile in screenshot demo 2: nella sezione "Framework più adatti"
+mostriamo i 3 podio con `st.metric` che li mette tutti in orizzontale
+su 3 colonne. I nomi framework sono lunghi (60-80 char) → si troncano
+con "..." rendendo illeggibili.
+
+Fix proposto:
+- Sostituire layout `st.columns(3) + st.metric` con un layout VERTICALE
+  o a card che permette wrap del titolo su più righe:
+  - Opzione A: lista verticale con 3 "card" stacked, ognuna con
+    medaglia (1°/2°/3°) + nome completo wrappato + punteggio in
+    ambrato grosso
+  - Opzione B: 3 colonne ma con `st.container` + markdown invece di
+    st.metric, così il testo wrappa
+- Sotto resta la "Classifica completa" come tabella che già funziona
+
+### Cosa fa il backend (NON toccare)
+
+- `cicerone/llm/diagnostica.py`: cap `MAX_DOMANDE=5` ora conta SOLO le
+  domande "vere" (non re-ask). Re-ask hanno cap separato (`MAX_RIASK=3`).
+  Quindi totale possibile: 5 + 3 = 8 turn, ma le 5 vere garantite. Fixa
+  il bug "si è bloccato a 7 perché contava re-ask".
+- `cicerone/llm/intervista.py`: aggiunta gestione "non capito". Se utente
+  risponde vago o esplicitamente "non ho capito", `parse_risposta`
+  ritorna `{"needs_clarification": True, "clarification_question": "...",
+  ...}`. Tu UI dovrai:
+  - Controllare `if parsed.get("needs_clarification"):` PRIMA di
+    salvare e avanzare
+  - Mostrare `parsed["clarification_question"]` in chat (assistente)
+    senza salvare il peso
+  - Tracciare in session_state che è già stato fatto 1 chiarimento per
+    questo criterio (es. `intervista_clarif_done[criterio_id]`)
+  - Al 2° tentativo, accettare comunque il parse normale (anche se
+    ambiguo) e procedere
+
+Quando entrambe le parti sono pushate, fai `git pull` e collega le tue
+modifiche al nuovo comportamento backend.
+
+### Vincoli round 4
+
+- ❌ NON toccare `cicerone/llm/`, `cicerone/db/`, `cicerone/mcda/`
+- ✅ Solo `cicerone/ui/` e `.streamlit/` e `cicerone/ui/style.css`
+- ✅ Commit + push appena pronto, anche WIP
+
+---
+
 ## ROUND 3 — diario UI (2026-06-15)
 
 ### File modificati / creati
