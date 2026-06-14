@@ -36,6 +36,11 @@ try:
 except ImportError:
     llm_report = _mock
 
+try:
+    from cicerone.llm import intervista as llm_intervista
+except ImportError:
+    llm_intervista = None
+
 # salva_contesto: prova nel repository (round 2), fallback al mock no-op
 salva_contesto = getattr(repo, "salva_contesto", _mock.salva_contesto)
 
@@ -94,6 +99,9 @@ def init_state() -> None:
     st.session_state.setdefault("assessment_id", None)
     st.session_state.setdefault("criteri", None)
     st.session_state.setdefault("idx_criterio", 0)
+    st.session_state.setdefault("intervista_domanda_corrente", None)
+    st.session_state.setdefault("intervista_idx_corrente", None)
+    st.session_state.setdefault("intervista_ultima_parsed", None)
     st.session_state.setdefault("diag_domanda_corrente", None)
     st.session_state.setdefault("diag_risposta_input", "")
     st.session_state.setdefault("report_markdown", None)
@@ -193,47 +201,79 @@ def pagina_intervista() -> None:
         st.rerun()
 
     criterio = criteri[i]
+    contesto = st.session_state.contesto_azienda
+
     st.header(f"Criterio {i+1}/{n}")
     st.subheader(criterio["nomeCriterio"])
-    with st.expander("Definizione", expanded=True):
+    with st.expander("Definizione", expanded=False):
         st.write(criterio["definizione"])
+
+    if llm_intervista is None:
+        st.error("Modulo intervista LLM non disponibile.")
+        return
+
+    # Genera domanda LLM la prima volta che visiti questo criterio
+    if st.session_state.intervista_idx_corrente != i or st.session_state.intervista_domanda_corrente is None:
+        with st.spinner("Genero la domanda..."):
+            st.session_state.intervista_domanda_corrente = llm_intervista.domanda_per_criterio(criterio, contesto)
+        st.session_state.intervista_idx_corrente = i
+        st.session_state.intervista_ultima_parsed = None
+
+    with st.chat_message("assistant"):
+        st.markdown(st.session_state.intervista_domanda_corrente)
 
     pesi_compilati = {p["criterio_id"]: p for p in repo.get_pesi_assessment(st.session_state.assessment_id)}
     precompilato = pesi_compilati.get(criterio["idCriterio"])
+    risposta_default = (precompilato or {}).get("motivazione") or ""
 
-    with st.form(f"criterio_{criterio['idCriterio']}"):
-        livello_default = LIVELLI.index(precompilato["livello"]) if precompilato else 2
-        livello = st.selectbox(
-            "Quanto è importante questo criterio per la tua azienda?",
-            LIVELLI,
-            index=livello_default,
-        )
-        motivazione = st.text_area(
-            "Motivazione (perché questo livello?)",
-            value=(precompilato or {}).get("motivazione") or "",
-            height=120,
+    with st.form(f"criterio_{criterio['idCriterio']}", clear_on_submit=False):
+        risposta = st.text_area(
+            "La tua risposta (libera, in italiano)",
+            value=risposta_default,
+            height=140,
+            placeholder="Es. è critico per noi perché...",
         )
         col_indietro, _, col_avanti = st.columns([1, 2, 1])
         with col_indietro:
             indietro = st.form_submit_button("← Indietro", disabled=(i == 0))
         with col_avanti:
             avanti = st.form_submit_button(
-                "Vai al calcolo →" if i == n - 1 else "Salva e prossimo →"
+                "Vai al calcolo →" if i == n - 1 else "Salva e prossimo →",
+                type="primary",
             )
+
+    # Mostra parsing precedente per trasparenza
+    if st.session_state.intervista_ultima_parsed:
+        p = st.session_state.intervista_ultima_parsed
+        livello_label = f"**Livello inferito:** {p['livello']} (peso {p['peso']})"
+        if p["ambiguo"]:
+            st.warning(f"{livello_label} — risposta giudicata ambigua dal modello.")
+        else:
+            st.success(livello_label)
 
     if indietro:
         st.session_state.idx_criterio = max(0, i - 1)
+        st.session_state.intervista_domanda_corrente = None
         st.rerun()
 
     if avanti:
+        if not risposta.strip():
+            st.warning("Scrivi una risposta prima di proseguire.")
+            return
+        with st.spinner("Analisi risposta..."):
+            parsed = llm_intervista.parse_risposta(criterio, contesto, risposta.strip())
+        st.session_state.intervista_ultima_parsed = parsed
         repo.salva_peso(
             assessment_id=st.session_state.assessment_id,
             criterio_id=criterio["idCriterio"],
-            livello=livello,
-            peso=LIVELLO_PESO[livello],
-            motivazione=motivazione.strip() or None,
+            livello=parsed["livello"],
+            peso=parsed["peso"],
+            motivazione=parsed["motivazione"] or risposta.strip(),
+            trascrizione=risposta.strip(),
+            ambiguo=parsed["ambiguo"],
         )
         st.session_state.idx_criterio = i + 1
+        st.session_state.intervista_domanda_corrente = None
         if st.session_state.idx_criterio >= n:
             st.session_state.step = "vincitore"
         st.rerun()
