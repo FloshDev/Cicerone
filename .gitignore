@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+
+# Virtualenv (uv)
+.venv/
+
+# Segreti
+.env
+
+# DB locale generato a runtime
+*.db
+cicerone/data/
+
+# Report generati
+cicerone/data/reports/
+
+# Knowledge base (contenuto protetto, vive nel repo privato cicerone-knowledge
+# clonato a parte dentro knowledge/)
+knowledge/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+.claude/
+*.swp
+
+# Excel lockfiles
+~$*.xlsx
+~$*.docx
