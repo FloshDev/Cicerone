@@ -656,3 +656,64 @@ Da segnalare al backend: spostare la migration fuori dal load del modulo (es. fu
 - `python -c "from cicerone.ui import app"` con DB fresco → OK, nessuna eccezione, tutti i moduli backend importati (mcda/llm.diagnostica/llm.report/llm.intervista/repo.salva_contesto).
 - `uv run streamlit run cicerone/ui/app.py` → HTTP 200 su `:8501`.
 
+---
+
+## ROUND 4 — diario UI (2026-06-15, notte)
+
+### File modificati
+
+- **`cicerone/ui/app.py`**: refactor con nuovi helper, navigazione cliccabile, gestione clarification, cards top 3, spinner ambrato.
+- **`cicerone/ui/style.css`**: classi per sidebar nav, cards framework, spinner ambrato animato.
+
+### Modifiche per fix
+
+#### 1. Sidebar fasi cliccabili
+- Rimossi i `<div class="cic-step">` markdown statici, sostituiti con `st.sidebar.button` veri.
+- Tracking in `st.session_state["fasi_raggiunte"]` (set di step raggiunti, default `{"onboarding"}`).
+- Helper `vai_a(step)` (riusato in tutte le transizioni delle pagine): aggiunge a `fasi_raggiunte` + cambia `step` + rerun.
+- Disabilitazione: il bottone è disabled se `step not in fasi_raggiunte` (fase non ancora raggiunta) o `step == fase_corrente` (no rerun inutili sul punto in cui sei).
+- Visivo: prefisso `●` sull'attivo (gli altri spazio), numero romano in colonna fissa, label dopo. CSS nuovo (`[data-testid="stSidebar"] .stButton button`) trasparente con hover ambrato e disabled opaco al 55%.
+
+#### 2. Spinner ambrato centrato
+- Nuovo helper `@contextmanager def spinner_cicerone(message: str)`: monta un `st.empty()` con cerchio CSS animato (`@keyframes cic-spin`, 52px, bordo ambrato top-color) + testo italico Cormorant Garamond centrato sotto.
+- Sostituito `st.spinner(...)` con `spinner_cicerone(...)` in: verifica chiave API, generazione domanda intervista, parse risposta intervista, generazione domanda diagnostica, parse risposta diagnostica, generazione report.
+- Per il report mantenevo `st.status` con log step; semplificato a `spinner_cicerone` per coerenza visiva (vedi punto 2 della task, "considera st.status" → ho preferito un solo pattern visivo).
+
+#### 3. Top 3 framework — cards leggibili
+- Sostituiti `st.columns(3) + st.metric` con un blocco HTML iniettato: `<div class="cic-cards">` che contiene tre `cic-card` verticali stacked.
+- Ogni card: medaglia romana ambrata (I, II, III) a sinistra, nome framework full-width che wrappa su più righe (`word-wrap: break-word`), punteggio in serif ambrato a destra.
+- Layout flex, niente troncamento. La classifica completa sotto resta in `st.dataframe`.
+
+### Backend agganciato
+
+- **`needs_clarification`** in `parse_risposta`: in `pagina_intervista`, dopo il parse controllo `parsed.get("needs_clarification")`. Se True e il criterio NON è in `intervista_clarif_done` (set per criterio_id), aggiungo al set, uso `parsed["clarification_question"]` come nuova `intervista_domanda_corrente`, rerun. Al 2° tentativo (criterio già nel set) accetto il parse con fallback (`livello = "Abbastanza importante"`, `peso = 5.0`, `ambiguo = False`).
+- **`is_riask`** in `storia_diagnostica`: già coperto da round 3, etichetta "Approfondimento — " sui re-ask resta.
+
+### Re-popolazione stato onboarding
+
+- Quando si torna su onboarding via sidebar, tutti i widget (text_input, selectbox, radio, text_area) sono pre-popolati da `st.session_state.contesto_azienda`.
+- Helper `_idx_o_default(lista, valore, default)` per gli indici dei selectbox.
+- Modifica importante: alla resubmit del form NON ricreo un nuovo `assessment_id` se ce n'è già uno attivo. Aggiorno solo il contesto in DB via `salva_contesto`. Quindi tornare indietro per correggere un campo NON invalida i pesi già compilati nell'intervista.
+
+### Tagline aggiornata
+
+- Da "Il framework giusto per la tua AI, scelto bene." a **"La voce che orienta la tua PMI nell'adozione dell'AI."** (scelta dell'utente, opzione D fra 5 proposte: tono narrativo, "voce" richiama l'oratore Cicerone, PMI esplicita, AI come obiettivo).
+
+### Decisioni di design prese da solo
+
+- **Marker fase attiva**: `●` ambrato come prefisso del label di bottone, non più underline o background. Non perfetto come UX, ma con `disabled=(attivo or non_raggiunta)` il bottone attivo non è cliccabile e questo basta a comunicarlo.
+- **Card medaglie**: numeri romani al posto di "1°/2°/3°" per coerenza con stepper sidebar.
+- **`spinner_cicerone` invece di `st.status` sul report**: un solo linguaggio visivo. `st.status` con i log step era informativo ma rompeva la palette/font. Preferenza per identità coerente.
+- **`assessment_id` persistente attraverso navigate-back**: scelta esplicita per non perdere lavoro se utente torna sull'onboarding a correggere un campo.
+
+### Cosa rimane aperto
+
+- **CSS sidebar bottoni**: la regola `[data-testid="stSidebar"] .stButton button` colpisce anche il bottone "Ricomincia". Visivamente coerente (trasparente, hover ambrato), ma il comportamento è azione distruttiva con stile blando. Da valutare se differenziarlo (es. colore rosso muted) — non priorità.
+- **Test del flusso clarification reale**: la logica è sbloccabile solo con API key e risposte vaghe. Smoke test fatto via `python -c "from cicerone.ui import app"` (import senza errori). UX end-to-end da validare dal browser.
+- **Stepper attivo con `●` ASCII**: sufficiente per ora, in futuro un'icona inline SVG ambrato sarebbe più coerente con l'identità classica.
+
+### Verifica
+
+- `python -c "from cicerone.ui import app"` → OK, tutte le funzioni esistono (`vai_a`, `spinner_cicerone`, `FASI`, `verifica_chiave`).
+- `uv run streamlit run cicerone/ui/app.py` → HTTP 200 su `:8501`, nessun errore in log.
+

@@ -5,6 +5,7 @@ Avvio:
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 
 import streamlit as st
@@ -94,6 +95,7 @@ SETTORI = [
 ]
 FASCE_DIPENDENTI = ["1-9", "10-49", "50-249", "250+"]
 FASCE_FATTURATO = ["< 500k €", "500k - 2M €", "2M - 10M €", "10M - 50M €", "> 50M €"]
+USO_AI_OPZIONI = ["No", "Sì, in modo sporadico", "Sì, in modo strutturato"]
 NAZIONI_EUROPA = [
     "Austria", "Belgio", "Bulgaria", "Cechia", "Cipro", "Croazia",
     "Danimarca", "Estonia", "Finlandia", "Francia", "Germania", "Grecia",
@@ -104,15 +106,23 @@ NAZIONI_EUROPA = [
 
 ROMANI = ["I", "II", "III", "IV", "V"]
 
+FASI = [
+    ("onboarding", "Profilo azienda"),
+    ("intervista", "Intervista"),
+    ("vincitore", "Framework vincitore"),
+    ("diagnostica", "Diagnostica"),
+    ("report", "Report finale"),
+]
+
 CHIAVI_RESET = (
     "step", "contesto_azienda", "assessment_id", "criteri", "idx_criterio",
     "intervista_domanda_corrente", "intervista_idx_corrente",
-    "intervista_ultima_parsed",
-    "diag_domanda_corrente", "report_markdown",
+    "intervista_ultima_parsed", "intervista_clarif_done",
+    "diag_domanda_corrente", "report_markdown", "fasi_raggiunte",
 )
 
 
-# ---------- helpers ----------
+# ---------- helpers UI ----------
 
 def inject_style() -> None:
     css = STYLE_CSS.read_text(encoding="utf-8")
@@ -131,6 +141,41 @@ def header_cicerone() -> None:
     )
 
 
+@contextmanager
+def spinner_cicerone(message: str):
+    """Spinner ambrato centrato + testo italico. Sostituisce st.spinner per
+    le attese LLM più visibili."""
+    placeholder = st.empty()
+    placeholder.markdown(
+        f'<div class="cic-spinner-wrap">'
+        f'<div class="cic-spinner"></div>'
+        f'<div class="cic-spinner-text">{message}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+    try:
+        yield
+    finally:
+        placeholder.empty()
+
+
+def vai_a(nuovo_step: str) -> None:
+    """Cambia step e registra come raggiunto. Poi rerun."""
+    raggiunte = st.session_state.setdefault("fasi_raggiunte", {"onboarding"})
+    raggiunte.add(nuovo_step)
+    st.session_state.step = nuovo_step
+    st.rerun()
+
+
+def _idx_o_default(lista: list, valore, default):
+    """Indice di valore in lista; se assente, indice del default."""
+    if valore in lista:
+        return lista.index(valore)
+    return lista.index(default) if default in lista else 0
+
+
+# ---------- stato ----------
+
 def init_state() -> None:
     st.session_state.setdefault("step", "onboarding")
     st.session_state.setdefault("contesto_azienda", None)
@@ -140,11 +185,13 @@ def init_state() -> None:
     st.session_state.setdefault("intervista_domanda_corrente", None)
     st.session_state.setdefault("intervista_idx_corrente", None)
     st.session_state.setdefault("intervista_ultima_parsed", None)
+    st.session_state.setdefault("intervista_clarif_done", set())
     st.session_state.setdefault("diag_domanda_corrente", None)
     st.session_state.setdefault("report_markdown", None)
     st.session_state.setdefault("api_key", "")
-    st.session_state.setdefault("api_key_valida", None)  # None/True/False
+    st.session_state.setdefault("api_key_valida", None)
     st.session_state.setdefault("api_key_messaggio", "")
+    st.session_state.setdefault("fasi_raggiunte", {"onboarding"})
 
 
 def get_criteri() -> list[dict]:
@@ -167,6 +214,8 @@ def verifica_chiave(api_key: str) -> tuple[bool, str]:
         return False, f"{type(e).__name__}: {str(e)[:200]}"
 
 
+# ---------- sidebar ----------
+
 def sidebar_stepper() -> None:
     step = st.session_state.step
 
@@ -188,33 +237,30 @@ def sidebar_stepper() -> None:
 
     st.sidebar.markdown('<div class="cic-divider">─── · ───</div>', unsafe_allow_html=True)
 
-    fasi = [
-        ("onboarding", "Profilo azienda"),
-        ("intervista", "Intervista"),
-        ("vincitore", "Framework vincitore"),
-        ("diagnostica", "Diagnostica"),
-        ("report", "Report finale"),
-    ]
-    blocchi = []
-    for n, (key, label) in enumerate(fasi):
-        attivo = "cic-active" if key == step else ""
-        blocchi.append(
-            f'<div class="cic-step {attivo}">'
-            f'<span class="cic-step-num">{ROMANI[n]}</span>'
-            f'<span class="cic-step-label">{label}</span>'
-            f'</div>'
-        )
-    st.sidebar.markdown("\n".join(blocchi), unsafe_allow_html=True)
+    raggiunte = st.session_state.get("fasi_raggiunte", {"onboarding"})
+    for n, (key, label) in enumerate(FASI):
+        sbloccata = key in raggiunte
+        attivo = key == step
+        marker = "●" if attivo else " "
+        button_label = f"{marker}  {ROMANI[n]}   {label}"
+        if st.sidebar.button(
+            button_label,
+            key=f"nav_{key}",
+            disabled=(not sbloccata) or attivo,
+            use_container_width=True,
+        ):
+            st.session_state.step = key
+            st.rerun()
 
     if step == "intervista":
         criteri = get_criteri()
-        n = len(criteri)
-        i = min(st.session_state.idx_criterio, n)
+        n_crit = len(criteri)
+        i = min(st.session_state.idx_criterio, n_crit)
         st.sidebar.markdown('<div class="cic-divider">─── · ───</div>', unsafe_allow_html=True)
-        st.sidebar.progress(i / n if n else 0, text=f"Criterio {min(i+1, n)}/{n}")
+        st.sidebar.progress(i / n_crit if n_crit else 0, text=f"Criterio {min(i+1, n_crit)}/{n_crit}")
 
     st.sidebar.markdown('<div class="cic-divider">─── · ───</div>', unsafe_allow_html=True)
-    if st.sidebar.button("Ricomincia"):
+    if st.sidebar.button("Ricomincia", key="sidebar_restart"):
         for k in CHIAVI_RESET:
             st.session_state.pop(k, None)
         st.rerun()
@@ -237,14 +283,13 @@ def blocco_api_key() -> None:
         verifica_clicked = st.button("Verifica chiave", type="primary", disabled=not api_key.strip())
 
     if verifica_clicked:
-        with st.spinner("Sto verificando la chiave con un ping ad Anthropic..."):
+        with spinner_cicerone("Sto verificando la chiave con un ping ad Anthropic..."):
             ok, msg = verifica_chiave(api_key.strip())
         st.session_state.api_key = api_key.strip()
         st.session_state.api_key_valida = ok
         st.session_state.api_key_messaggio = msg
-        st.rerun()  # re-render sidebar con stato aggiornato
+        st.rerun()
     elif api_key and api_key.strip() != st.session_state.api_key:
-        # Chiave modificata dopo verifica: invalida l'esito precedente
         st.session_state.api_key = api_key.strip()
         st.session_state.api_key_valida = None
         st.session_state.api_key_messaggio = ""
@@ -273,38 +318,47 @@ def pagina_onboarding() -> None:
     st.subheader("Profilo dell'azienda")
     st.caption("I dati restano locali; servono al modello per adattare l'intervista al tuo contesto.")
 
+    ctx = st.session_state.contesto_azienda or {}
+
     with st.form("onboarding"):
         nome_azienda = st.text_input(
             "Nome azienda",
-            value=(st.session_state.contesto_azienda or {}).get("nome_azienda", ""),
+            value=ctx.get("nome_azienda", ""),
             placeholder="Es. Acme S.r.l.",
         )
-        settore = st.selectbox("Settore", SETTORI, index=0)
-        dipendenti = st.selectbox("Numero di dipendenti", FASCE_DIPENDENTI, index=1)
+        settore = st.selectbox(
+            "Settore", SETTORI,
+            index=_idx_o_default(SETTORI, ctx.get("settore"), "Manifatturiero"),
+        )
+        dipendenti = st.selectbox(
+            "Numero di dipendenti", FASCE_DIPENDENTI,
+            index=_idx_o_default(FASCE_DIPENDENTI, ctx.get("fascia_dipendenti"), "10-49"),
+        )
         nazione = st.selectbox(
-            "Nazione",
-            NAZIONI_EUROPA,
-            index=NAZIONI_EUROPA.index("Italia"),
+            "Nazione", NAZIONI_EUROPA,
+            index=_idx_o_default(NAZIONI_EUROPA, ctx.get("nazione"), "Italia"),
         )
         regione = st.text_input(
             "Regione / Cantone / Stato — opzionale",
-            value=(st.session_state.contesto_azienda or {}).get("regione") or "",
+            value=ctx.get("regione") or "",
             placeholder="Es. Lombardia, Vaud, Bayern...",
         )
         gia_usa_ai = st.radio(
             "L'azienda utilizza già strumenti AI?",
-            ["No", "Sì, in modo sporadico", "Sì, in modo strutturato"],
+            USO_AI_OPZIONI,
+            index=_idx_o_default(USO_AI_OPZIONI, ctx.get("uso_ai_attuale"), "No"),
         )
-        fatturato = st.selectbox("Fascia di fatturato annuo", FASCE_FATTURATO, index=1)
+        fatturato = st.selectbox(
+            "Fascia di fatturato annuo", FASCE_FATTURATO,
+            index=_idx_o_default(FASCE_FATTURATO, ctx.get("fascia_fatturato"), "500k - 2M €"),
+        )
         note = st.text_area(
             "Note aggiuntive (opzionale)",
+            value=ctx.get("note") or "",
             placeholder="Es. processo principale, mercato, vincoli...",
         )
 
         chiave_ok = st.session_state.api_key_valida is True
-        # NB: dentro st.form, le variabili dei widget non si aggiornano live
-        # con la digitazione. Quindi NON usare nome_azienda per disabilitare
-        # il submit: validiamo on-submit e mostriamo errore se vuoto.
         submitted = st.form_submit_button(
             "Avvia intervista",
             type="primary",
@@ -319,7 +373,7 @@ def pagina_onboarding() -> None:
         return
 
     if submitted and chiave_ok and nome_azienda.strip():
-        st.session_state.contesto_azienda = {
+        nuovo_contesto = {
             "nome_azienda": nome_azienda.strip(),
             "settore": settore,
             "fascia_dipendenti": dipendenti,
@@ -329,11 +383,14 @@ def pagina_onboarding() -> None:
             "fascia_fatturato": fatturato,
             "note": note.strip() or None,
         }
-        st.session_state.assessment_id = repo.crea_assessment(SHEET)
-        salva_contesto(st.session_state.assessment_id, st.session_state.contesto_azienda)
-        st.session_state.step = "intervista"
-        st.session_state.idx_criterio = 0
-        st.rerun()
+        st.session_state.contesto_azienda = nuovo_contesto
+        # Crea un nuovo assessment SOLO se non c'è ancora uno attivo
+        # (tornando indietro dall'intervista NON vogliamo invalidare il lavoro fatto)
+        if st.session_state.assessment_id is None:
+            st.session_state.assessment_id = repo.crea_assessment(SHEET)
+            st.session_state.idx_criterio = 0
+        salva_contesto(st.session_state.assessment_id, nuovo_contesto)
+        vai_a("intervista")
 
 
 def pagina_intervista() -> None:
@@ -342,11 +399,11 @@ def pagina_intervista() -> None:
     i = st.session_state.idx_criterio
 
     if i >= n:
-        st.session_state.step = "vincitore"
-        st.rerun()
+        vai_a("vincitore")
 
     criterio = criteri[i]
     contesto = st.session_state.contesto_azienda
+    criterio_id = criterio["idCriterio"]
 
     header_cicerone()
     st.subheader(f"Criterio {i+1}/{n} — {criterio['nomeCriterio']}")
@@ -359,7 +416,7 @@ def pagina_intervista() -> None:
 
     # Genera domanda quando entri nel criterio
     if st.session_state.intervista_idx_corrente != i or st.session_state.intervista_domanda_corrente is None:
-        with st.spinner("Sto formulando la domanda adatta al tuo contesto..."):
+        with spinner_cicerone("Sto formulando la domanda adatta al tuo contesto..."):
             st.session_state.intervista_domanda_corrente = llm_intervista.domanda_per_criterio(
                 criterio, contesto
             )
@@ -369,7 +426,7 @@ def pagina_intervista() -> None:
     with st.chat_message("assistant"):
         st.markdown(st.session_state.intervista_domanda_corrente)
 
-    # Mostra parsing precedente per trasparenza (se siamo tornati avanti su questo criterio)
+    # Mostra parsing precedente per trasparenza
     if st.session_state.intervista_ultima_parsed:
         p = st.session_state.intervista_ultima_parsed
         livello_label = f"**Livello inferito:** {p['livello']} (peso {p['peso']})"
@@ -378,7 +435,6 @@ def pagina_intervista() -> None:
         else:
             st.success(livello_label)
 
-    # Bottone Indietro sopra l'input chat (chat_input vive sticky in basso)
     col_back, _ = st.columns([1, 5])
     with col_back:
         if st.button("← Indietro", disabled=(i == 0), key=f"back_{i}"):
@@ -396,23 +452,49 @@ def pagina_intervista() -> None:
     if risposta and risposta.strip():
         with st.chat_message("user"):
             st.markdown(risposta)
-        with st.spinner("Sto interpretando la tua risposta..."):
+        with spinner_cicerone("Sto interpretando la tua risposta..."):
             parsed = llm_intervista.parse_risposta(criterio, contesto, risposta.strip())
+
+        # Gestione clarification: 1 sola richiesta di chiarimento per criterio
+        clarif_done = st.session_state.intervista_clarif_done
+        if parsed.get("needs_clarification") and criterio_id not in clarif_done:
+            clarif_done.add(criterio_id)
+            st.session_state.intervista_domanda_corrente = (
+                parsed.get("clarification_question")
+                or "Puoi spiegare meglio cosa intendi?"
+            )
+            st.session_state.intervista_ultima_parsed = None
+            st.rerun()
+
+        # Salva e procedi (anche se 2° tentativo ambiguo)
         st.session_state.intervista_ultima_parsed = parsed
         repo.salva_peso(
             assessment_id=st.session_state.assessment_id,
-            criterio_id=criterio["idCriterio"],
-            livello=parsed["livello"],
-            peso=parsed["peso"],
-            motivazione=parsed["motivazione"] or risposta.strip(),
+            criterio_id=criterio_id,
+            livello=parsed.get("livello", "Abbastanza importante"),
+            peso=parsed.get("peso", 5.0),
+            motivazione=parsed.get("motivazione") or risposta.strip(),
             trascrizione=risposta.strip(),
-            ambiguo=parsed["ambiguo"],
+            ambiguo=parsed.get("ambiguo", False),
         )
         st.session_state.idx_criterio = i + 1
         st.session_state.intervista_domanda_corrente = None
         if st.session_state.idx_criterio >= n:
-            st.session_state.step = "vincitore"
-        st.rerun()
+            vai_a("vincitore")
+        else:
+            st.rerun()
+
+
+def _card_framework(medaglia: str, voce: dict) -> str:
+    return (
+        f'<div class="cic-card">'
+        f'<div class="cic-card-medal">{medaglia}</div>'
+        f'<div class="cic-card-body">'
+        f'<div class="cic-card-name">{voce["nome"]}</div>'
+        f'<div class="cic-card-score">{voce["punteggio"]:.1f} pt</div>'
+        f'</div>'
+        f'</div>'
+    )
 
 
 def pagina_vincitore() -> None:
@@ -431,11 +513,9 @@ def pagina_vincitore() -> None:
         return
 
     top3 = classifica[:3]
-    cols = st.columns(3)
-    medaglie = ["1°", "2°", "3°"]
-    for col, voce, medaglia in zip(cols, top3, medaglie):
-        with col:
-            st.metric(label=medaglia, value=voce["nome"], delta=f"{voce['punteggio']:.1f} pt")
+    medaglie = ["I", "II", "III"]
+    cards_html = "".join(_card_framework(m, v) for m, v in zip(medaglie, top3))
+    st.markdown(f'<div class="cic-cards">{cards_html}</div>', unsafe_allow_html=True)
 
     divider_cicerone()
     st.subheader("Classifica completa")
@@ -470,9 +550,8 @@ def pagina_vincitore() -> None:
 
     divider_cicerone()
     if st.button("Continua alla diagnostica →", type="primary"):
-        st.session_state.step = "diagnostica"
         st.session_state.diag_domanda_corrente = None
-        st.rerun()
+        vai_a("diagnostica")
 
 
 def pagina_diagnostica() -> None:
@@ -482,7 +561,6 @@ def pagina_diagnostica() -> None:
     st.subheader("Diagnostica guidata")
     st.caption("Rispondi alle domande per personalizzare il report finale.")
 
-    # Storia Q&A precedenti (dal DB, escluse righe pending)
     storia_fn = getattr(repo, "storia_diagnostica", None) or getattr(_mock, "storia_diagnostica", lambda _: [])
     storia = storia_fn(assessment_id)
     for qa in storia:
@@ -493,15 +571,14 @@ def pagina_diagnostica() -> None:
             st.markdown(qa["risposta_utente"])
 
     if st.session_state.diag_domanda_corrente is None:
-        with st.spinner("Sto generando la prossima domanda..."):
+        with spinner_cicerone("Sto generando la prossima domanda..."):
             st.session_state.diag_domanda_corrente = llm_diag.next_question(assessment_id)
 
     domanda = st.session_state.diag_domanda_corrente
     if domanda is None:
         st.success("Diagnostica completata.")
         if st.button("Genera il report →", type="primary"):
-            st.session_state.step = "report"
-            st.rerun()
+            vai_a("report")
         return
 
     with st.chat_message("assistant"):
@@ -512,7 +589,7 @@ def pagina_diagnostica() -> None:
     if risposta and risposta.strip():
         with st.chat_message("user"):
             st.markdown(risposta)
-        with st.spinner("Sto interpretando la tua risposta..."):
+        with spinner_cicerone("Sto interpretando la tua risposta..."):
             prossima = llm_diag.next_question(
                 assessment_id,
                 domanda_precedente=domanda,
@@ -528,15 +605,10 @@ def pagina_report() -> None:
     st.subheader("Report finale")
 
     if st.session_state.report_markdown is None:
-        with st.status(
-            "Sto preparando il report finale, possono volerci 20-30 secondi...",
-            expanded=True,
-        ) as status:
-            st.write("Raccolgo i pesi dei criteri e il contesto aziendale.")
-            st.write("Invoco il modello per la sintesi narrativa.")
+        with spinner_cicerone(
+            "Sto preparando il report finale, possono volerci 20-30 secondi..."
+        ):
             st.session_state.report_markdown = llm_report.genera_report(assessment_id)
-            st.write("Report pronto.")
-            status.update(label="Report generato.", state="complete", expanded=False)
 
     markdown = st.session_state.report_markdown
     st.markdown(markdown)
@@ -567,7 +639,6 @@ def main() -> None:
     init_state()
     sidebar_stepper()
 
-    # Se l'utente ha già una chiave verificata, riallineala al client backend
     if st.session_state.api_key and st.session_state.api_key_valida:
         set_api_key(st.session_state.api_key)
 
