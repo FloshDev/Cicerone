@@ -18,8 +18,10 @@ from cicerone.db import repository as repo
 from cicerone.llm._client import get_client
 
 MODEL = "claude-haiku-4-5-20251001"
-MAX_DOMANDE = 5
+MAX_DOMANDE = 7  # include eventuali re-domande
 MIN_DOMANDE = 3
+MAX_RIASK = 2  # cap totale re-domande nella sessione
+RIASK_TAG = "[RIASK]"
 
 KNOWLEDGE_DIR = Path(__file__).parent.parent.parent / "knowledge" / "frameworks"
 
@@ -82,14 +84,44 @@ Fai da {MIN_DOMANDE} a {MAX_DOMANDE} domande mirate, UNA ALLA VOLTA, per:
 2. Identificare gap specifici rispetto al framework consigliato
 3. Raccogliere informazioni utili per il report finale (azioni concrete)
 
-Regole:
+Regole base:
 - Ogni risposta tua = SOLO una singola domanda (no preamboli, no commenti)
 - Domande concrete, operative, in italiano, max 2 righe
 - Adatta le domande al settore e alla dimensione dell'azienda
 - Approfondisci dove i pesi sono alti (Fondamentale/Importante)
-- Quando hai raccolto abbastanza informazioni (almeno {MIN_DOMANDE} risposte)
-  rispondi ESATTAMENTE con la parola "STOP" (niente altro).
+
+# Gestione risposte vaghe (IMPORTANTE)
+
+Se l'ULTIMA risposta dell'utente è vaga, evasiva, generica, o non risponde
+alla domanda (esempi: "boh", "dipende", "un po'", "abbastanza", risposta che
+non contiene fatti concreti):
+- Anziché passare al prossimo topic, riformula la domanda in modo PIÙ MIRATO
+  e concreto sullo STESSO argomento (chiedi esempi, numeri, processi
+  specifici).
+- Prefissa la nuova domanda con la stringa esatta `{RIASK_TAG}` (incluse
+  parentesi quadre) per segnalare la re-domanda.
+- Esempio: `{RIASK_TAG} Mi puoi fare un esempio concreto di un progetto AI
+  che avete provato a lanciare nell'ultimo anno?`
+
+Vincoli sulle re-domande:
+- Massimo {MAX_RIASK} re-domande TOTALI nella sessione (vedi conversazione)
+- Una sola re-domanda per topic (se anche la seconda risposta è vaga, prosegui
+  al topic successivo)
+- Le re-domande contano nel totale {MAX_DOMANDE}
+
+# Chiusura
+
+Quando hai raccolto abbastanza informazioni concrete (almeno {MIN_DOMANDE}
+risposte significative non vaghe), rispondi ESATTAMENTE con la parola
+"STOP" (niente altro).
 """
+
+
+def _strip_riask(testo: str) -> str:
+    """Rimuove eventuale tag interno [RIASK] prima di mostrare all'utente."""
+    if testo.lstrip().startswith(RIASK_TAG):
+        return testo.lstrip()[len(RIASK_TAG):].lstrip()
+    return testo
 
 
 def next_question(
@@ -97,17 +129,25 @@ def next_question(
     domanda_precedente: str | None = None,
     risposta_precedente: str | None = None,
 ) -> str | None:
-    """Genera prossima domanda diagnostica, salva Q&A precedente se passata.
+    """Genera prossima domanda diagnostica.
+
+    Strategia persistenza:
+    - La domanda viene salvata in DB al momento della generazione, con
+      risposta_utente="" (sentinel "pending").
+    - Quando l'utente risponde, UPDATE della risposta sulla riga pending.
+    - `domanda_precedente` viene ignorato (usiamo la riga pending in DB).
 
     Ritorna None quando la diagnostica è chiusa.
     """
-    # 1. Salva Q&A precedente (se fornita)
-    if domanda_precedente and risposta_precedente:
-        repo.salva_diagnostica(
-            assessment_id=assessment_id,
-            domanda=domanda_precedente,
-            risposta_utente=risposta_precedente,
-        )
+    diags = repo.get_diagnostica(assessment_id)
+
+    # 1. Update risposta sulla riga "pending" (ultima senza risposta)
+    if risposta_precedente:
+        pending = next((d for d in reversed(diags) if not d["risposta_utente"]), None)
+        if pending:
+            repo.update_risposta_diagnostica(pending["idDiagnostica"], risposta_precedente)
+            # Reload diags con la risposta appena salvata
+            diags = repo.get_diagnostica(assessment_id)
 
     # 2. Carica stato
     ass = repo.get_assessment(assessment_id)
@@ -127,26 +167,35 @@ def next_question(
     framework = repo.get_framework(framework_id)
     contesto = repo.get_contesto(assessment_id) or {}
     pesi = repo.get_pesi_assessment(assessment_id)
-    diags = repo.get_diagnostica(assessment_id)
     framework_md = _carica_framework_md(framework_id)
 
-    # 3. Hard cap su domande
-    if len(diags) >= MAX_DOMANDE:
+    # 3. Considera solo diagnostiche già "risposte" per cap e storia
+    diags_risposte = [d for d in diags if d["risposta_utente"]]
+
+    if len(diags_risposte) >= MAX_DOMANDE:
         return None
 
-    # 4. Build messages: ricostruisce storia conversazione
+    n_riask = sum(1 for d in diags_risposte if d["domanda"].lstrip().startswith(RIASK_TAG))
+    riask_disponibili = max(0, MAX_RIASK - n_riask)
+
+    # 4. Build messages: ricostruisce storia conversazione (solo risposte)
     messages = []
-    for d in diags:
+    for d in diags_risposte:
         messages.append({"role": "assistant", "content": d["domanda"]})
         messages.append({"role": "user", "content": d["risposta_utente"]})
 
-    # Trigger LLM per prossima domanda
     if not messages:
-        # Prima chiamata: chiediamo direttamente la prima domanda
         messages.append({"role": "user", "content": "Inizia la diagnostica."})
     else:
-        # Già conversazione in corso: prossima domanda o STOP
-        messages.append({"role": "user", "content": "Prossima domanda o STOP se hai abbastanza informazioni."})
+        nota_riask = (
+            f"Hai ancora {riask_disponibili} re-domande disponibili (prefissa con {RIASK_TAG})."
+            if riask_disponibili > 0
+            else "Hai esaurito le re-domande, procedi al prossimo topic o STOP."
+        )
+        messages.append({
+            "role": "user",
+            "content": f"Prossima domanda (o STOP se basta). {nota_riask}",
+        })
 
     system = _system_prompt(
         contesto=contesto,
@@ -164,7 +213,20 @@ def next_question(
     testo = resp.content[0].text.strip()
 
     # 5. Check STOP
-    if testo.upper().startswith("STOP") and len(diags) >= MIN_DOMANDE:
+    if testo.upper().startswith("STOP") and len(diags_risposte) >= MIN_DOMANDE:
         return None
 
-    return testo
+    # 6. Se [RIASK] usato oltre il cap, downgrade a domanda normale (toglie tag)
+    if testo.startswith(RIASK_TAG) and riask_disponibili == 0:
+        testo = testo[len(RIASK_TAG):].lstrip()
+
+    # 7. Persisti domanda in DB (con tag se presente, per contare le re-ask).
+    # risposta_utente="" è il sentinel "pending".
+    repo.salva_diagnostica(
+        assessment_id=assessment_id,
+        domanda=testo,
+        risposta_utente="",
+    )
+
+    # 8. Ritorna testo pulito alla UI (senza tag interno [RIASK])
+    return _strip_riask(testo)

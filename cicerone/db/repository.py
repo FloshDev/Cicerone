@@ -177,6 +177,31 @@ def salva_diagnostica(
         return cur.lastrowid
 
 
+def storia_diagnostica(assessment_id: int) -> list[dict]:
+    """Diagnostica Q&A complete (esclude righe pending con risposta vuota).
+    Strip eventuale prefisso interno [RIASK] dalla domanda.
+    """
+    diags = get_diagnostica(assessment_id)
+    risultato = []
+    for d in diags:
+        if not d["risposta_utente"]:
+            continue
+        domanda = d["domanda"]
+        if domanda.lstrip().startswith("[RIASK]"):
+            domanda = domanda.lstrip()[len("[RIASK]"):].lstrip()
+        risultato.append({**d, "domanda": domanda, "is_riask": d["domanda"].lstrip().startswith("[RIASK]")})
+    return risultato
+
+
+def update_risposta_diagnostica(diagnostica_id: int, risposta_utente: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE Diagnostica SET risposta_utente = ? WHERE idDiagnostica = ?",
+            (risposta_utente, diagnostica_id),
+        )
+        conn.commit()
+
+
 def get_diagnostica(assessment_id: int) -> list[dict]:
     with get_connection() as conn:
         rows = conn.execute(

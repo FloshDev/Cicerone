@@ -52,7 +52,9 @@ def genera_report(assessment_id: int) -> str:
     contesto = repo.get_contesto(assessment_id) or {}
     pesi = repo.get_pesi_assessment(assessment_id)
     classifica = calcolo.classifica_framework(assessment_id)
-    diags = repo.get_diagnostica(assessment_id)
+    # Filtra solo Q&A complete
+    diags_tutti = repo.get_diagnostica(assessment_id)
+    diags = [d for d in diags_tutti if d.get("risposta_utente")]
 
     framework_id = ass.get("framework_vincitore_id") or (
         classifica[0]["framework_id"] if classifica else None
@@ -60,6 +62,8 @@ def genera_report(assessment_id: int) -> str:
     framework = repo.get_framework(framework_id) if framework_id else None
     framework_nome = framework["nomeFramework"] if framework else "Sconosciuto"
     framework_md = _carica_framework_md(framework_id) if framework_id else ""
+
+    nome_azienda = contesto.get("nome_azienda") or contesto.get("settore") or "Azienda"
 
     system = f"""Sei un consulente senior di AI Strategy per PMI italiane.
 Devi generare un REPORT FINALE personalizzato di valutazione AI Readiness per
@@ -69,37 +73,56 @@ Output: SOLO markdown ben formattato, in italiano, professionale ma leggibile.
 Tono: consulenziale, concreto, non accademico. Niente filler, niente premesse
 generiche, niente disclaimer.
 
-Struttura attesa:
+Struttura ESATTA (5 sezioni, niente "Riepilogo punteggi"):
 
-# Report AI Readiness — [nome o settore azienda]
+# Report AI Readiness — {nome_azienda}
+## Framework consigliato: {framework_nome}
+
+_(Subito sotto il titolo, in 1 frase italica, anticipa il "perché" della scelta)_
 
 ## 1. Profilo aziendale
-Sintesi del contesto fornito (1 paragrafo breve).
+Sintesi del contesto fornito (1 paragrafo breve, 3-5 righe).
+Cita nome azienda, settore, dimensione, paese/regione, eventuale uso AI attuale.
 
-## 2. Framework consigliato: {framework_nome}
-Spiega in 1-2 paragrafi PERCHÉ questo framework è il più adatto per questa
-specifica azienda (sfrutta i criteri con pesi alti + la knowledge base
-fornita).
+## 2. Perché questo framework
+2 paragrafi che spiegano PERCHÉ "{framework_nome}" è il più adatto per questa
+specifica azienda. Sfrutta: criteri con peso alto dell'azienda + knowledge base
+del framework. Niente generalità — argomenta sul caso concreto.
 
 ## 3. Maturità attuale e gap
-Analisi basata sulle risposte alla diagnostica. Identifica 2-4 gap principali
-tra stato attuale e framework target. Sii specifico.
+Analisi basata sulle risposte alla diagnostica. Identifica 2-4 gap specifici
+tra stato attuale e framework target. Per ogni gap: nome + 2-3 righe descrizione
++ implicazione operativa.
 
-## 4. Roadmap azioni (3-5 mosse concrete)
-Lista priorizzata di azioni operative, con orizzonte temporale realistico
-(es. "Q1 2026: ...", "6 mesi: ..."). Adatta a settore e dimensione azienda.
+## 4. Roadmap azioni (priorizzate)
+3-5 azioni concrete, in ordine di PRIORITÀ. Per ogni azione, formato esatto:
+
+### P1 — [Titolo azione]
+**Quando:** [orizzonte temporale realistico, es. "Q1 2026", "primi 90 giorni"]
+**Perché priorità P1:** [1-2 righe motivazione del livello di priorità —
+quale gap chiude, perché va fatto prima delle altre]
+**Cosa fare:** [3-5 righe operative, specifiche per settore e dimensione]
+
+Usa P1 = critica/immediata, P2 = importante/medio termine, P3 = consolidamento.
+NON usare P1 per tutto: ordina davvero.
 
 ## 5. KPI da monitorare
-3-5 KPI quantificabili allineati al framework consigliato.
+3-5 KPI quantificabili. Per ciascuno, formato esatto:
 
-## 6. Riepilogo punteggi
-Riporta tabella markdown con top 3 framework + punteggio.
+### [Nome KPI]
+**Cosa misura:** [1 riga, definizione operativa misurabile]
+**Perché è critico per voi:** [1-2 righe, lega al framework e ai gap identificati]
+**Come si calcola:** [formula o procedura concreta, con frequenza di
+rilevazione, es. "mensile da log sistema X"]
+**Baseline attuale → Target:** [valore stimato oggi → valore atteso entro N mesi]
 
 Regole di scrittura:
-- Niente bullet vuoti tipo "Da approfondire"
+- Niente bullet generici tipo "Da approfondire" o "Valutare"
 - Niente "potrebbe", "forse", "dipende" — sii direttivo
-- Cita criteri specifici dell'azienda dove rilevante
-- Lunghezza target: 600-900 parole
+- Cita criteri specifici e risposte specifiche dell'azienda dove rilevante
+- Tono diretto, italiano consulenziale, no anglicismi inutili
+- Lunghezza target: 700-1100 parole
+- NIENTE sezione "Riepilogo punteggi" o tabella classifica framework
 """
 
     user_prompt = f"""Genera il report per questa azienda.
@@ -110,20 +133,23 @@ Regole di scrittura:
 # Importanza criteri (compilata dall'azienda)
 {_formatta_pesi(pesi)}
 
-# Classifica framework (MCDA)
+# Classifica framework MCDA (solo per tuo riferimento interno — NON pubblicare)
 {_formatta_classifica(classifica)}
 
-# Diagnostica conversazionale
+Framework vincitore (oggetto del report): **{framework_nome}**
+
+# Diagnostica conversazionale (solo Q&A risposte)
 {_formatta_diagnostica(diags)}
 
 # Knowledge base framework vincitore ({framework_nome})
 {framework_md[:10000]}
 
-Genera ora il report completo in markdown."""
+Genera ora il report completo in markdown, seguendo la struttura esatta del
+system prompt (5 sezioni, niente riepilogo punteggi)."""
 
     resp = get_client().messages.create(
         model=MODEL,
-        max_tokens=4000,
+        max_tokens=4500,
         system=system,
         messages=[{"role": "user", "content": user_prompt}],
     )

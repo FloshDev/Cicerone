@@ -343,11 +343,13 @@ def pagina_diagnostica() -> None:
     st.header("Diagnostica guidata")
     st.caption("Rispondi alle domande per personalizzare il report finale.")
 
-    # Storia Q&A precedenti (dal DB)
-    storia = _mock.storia_diagnostica(assessment_id) if hasattr(_mock, "storia_diagnostica") else []
+    # Storia Q&A precedenti (dal DB, escluse righe pending)
+    storia_fn = getattr(repo, "storia_diagnostica", None) or getattr(_mock, "storia_diagnostica", lambda _: [])
+    storia = storia_fn(assessment_id)
     for qa in storia:
         with st.chat_message("assistant"):
-            st.markdown(qa["domanda"])
+            etichetta = "**Approfondimento** — " if qa.get("is_riask") else ""
+            st.markdown(f"{etichetta}{qa['domanda']}")
         with st.chat_message("user"):
             st.markdown(qa["risposta_utente"])
 
