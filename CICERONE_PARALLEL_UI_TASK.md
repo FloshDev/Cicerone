@@ -214,3 +214,93 @@ Forma del JSON salvato dalla UI (oggi vive solo in `st.session_state`, finché l
 - Nessuna dipendenza aggiunta al `pyproject.toml`.
 - Tutto accesso DB via `cicerone.db.repository` (l'unica eccezione è `bootstrap_schema()` lato UI, che usa `get_connection` per applicare `schema.sql` — non è uno SQL di dominio).
 
+---
+
+## ROUND 2 — task aggiuntive UI (2026-06-14, sera)
+
+Mentre tu hai chiuso il round 1, l'altro Claude sta scrivendo il backend
+per Fasi 5 (MCDA), 8 (diagnostica LLM multi-turno) e 9 (report LLM).
+Servono nuove pagine UI per chiudere il flusso end-to-end.
+
+### Vincoli aggiornati
+
+- Ora PUOI importare da `cicerone.mcda.calcolo` (sostituisci il mock quando il
+  backend pubblica il modulo — la firma è uguale al mock attuale)
+- Ora PUOI importare da `cicerone.llm.diagnostica` e `cicerone.llm.report`
+  (saranno pubblicati dal backend, vedi contratti sotto)
+- Continua a NON toccare `cicerone/db/`, `cicerone/mcda/`, `cicerone/llm/`
+- Lavora SOLO in `cicerone/ui/`
+
+### Contratti API che il backend ti garantisce
+
+```python
+# cicerone/mcda/calcolo.py — sostituisce _mock
+def classifica_framework(assessment_id: int) -> list[dict]
+def breakdown_per_criterio(assessment_id: int, framework_id: int) -> list[dict]
+
+# cicerone/llm/diagnostica.py
+def next_question(assessment_id: int, risposta_precedente: str | None) -> str | None:
+    """None = diagnostica chiusa, hai abbastanza info.
+    Altrimenti ritorna la prossima domanda da mostrare all'utente.
+    La funzione salva internamente Q&A in tabella Diagnostica."""
+
+# cicerone/llm/report.py
+def genera_report(assessment_id: int) -> str:
+    """Ritorna markdown completo del report personalizzato."""
+
+# cicerone/db/repository.py — funzione aggiunta dal backend
+def salva_contesto(assessment_id: int, contesto: dict) -> None:
+    """Salva JSON contesto_azienda. Migration ALTER TABLE già applicata."""
+```
+
+### Cosa devi fare
+
+1. **Sostituisci mock con MCDA reale** in `cicerone/ui/app.py`:
+   ```python
+   from cicerone.mcda import calcolo as mcda  # era: from cicerone.ui import _mock as mcda
+   ```
+   (`_mock.py` puoi tenerlo come fallback per debug o eliminarlo)
+
+2. **Chiama `repo.salva_contesto`** in onboarding submit (sostituisce il
+   "vive solo in session_state" del round 1)
+
+3. **Nuova pagina "Diagnostica"** (`step = "diagnostica"`, tra "vincitore" e
+   "report"):
+   - Layout chat-like: lista messaggi Q&A precedenti + input per nuova risposta
+   - Al load: `domanda = diagnostica.next_question(aid, None)`
+   - Salva risposta utente in `st.session_state` (o lascia che il backend
+     persista in tabella `Diagnostica`)
+   - Loop: `next_question(aid, risposta_utente)` → se `None` → bottone
+     "Continua al report" → step "report"; altrimenti mostra nuova domanda
+   - Mostra storia Q&A scrollabile
+
+4. **Nuova pagina "Report"** (`step = "report"`):
+   - `markdown = report.genera_report(assessment_id)`
+   - Renderizza con `st.markdown(markdown)`
+   - `st.download_button("Scarica report .md", markdown, file_name="report_cicerone.md")`
+   - Bottone "Nuovo assessment" → reset session_state, step = "onboarding"
+
+5. **State machine estesa**: stepper sidebar passa da 3 a 5 stati:
+   `onboarding → intervista → vincitore → diagnostica → report`
+
+### Workflow consigliato per te
+
+1. Inizia subito con state machine + scheletro vuoto pagine diagnostica/report
+   (puoi mockare gli import: `def next_question(*a, **kw): return "Mock?"` per
+   sviluppo locale finché backend non pubblica)
+2. Quando backend pusha `cicerone/mcda/calcolo.py` → fai `git pull` e cambia
+   import (1 riga)
+3. Quando backend pusha `cicerone/llm/diagnostica.py` e `cicerone/llm/report.py`
+   → fai `git pull` e collega le pagine vere
+4. Commit + push frequenti (anche WIP, così sblocchi l'altro lato)
+5. Backend ha 3h totali. Non aspettare per cominciare lo scheletro.
+
+### Stretti vincoli di tempo
+
+Il professore vuole la demo entro 3h. Modalità vibe coding pura:
+- No refactor, no test, no edge case
+- Codice ottimista (no try/except difensivi)
+- Output funzionante > output bello
+
+Buon lavoro.
+
