@@ -4,15 +4,10 @@ Aggrega: contesto azienda, pesi MCDA, classifica framework, Q&A diagnostica,
 knowledge base framework vincitore. Output: markdown completo pronto per
 download/distribuzione al cliente.
 """
-from anthropic import Anthropic
-from dotenv import load_dotenv
-
 from cicerone.db import repository as repo
 from cicerone.mcda import calcolo
 from cicerone.llm.diagnostica import _carica_framework_md
-
-load_dotenv()
-_client = Anthropic()
+from cicerone.llm._client import get_client
 
 MODEL = "claude-sonnet-4-6"  # Sonnet per qualità prosa report
 
@@ -126,7 +121,7 @@ Regole di scrittura:
 
 Genera ora il report completo in markdown."""
 
-    resp = _client.messages.create(
+    resp = get_client().messages.create(
         model=MODEL,
         max_tokens=4000,
         system=system,

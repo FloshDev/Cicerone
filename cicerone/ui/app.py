@@ -14,6 +14,12 @@ from cicerone.db import seed
 from cicerone.db.connection import get_connection
 from cicerone.ui import _mock
 
+try:
+    from cicerone.llm._client import set_api_key
+except ImportError:
+    def set_api_key(_k):  # type: ignore
+        return None
+
 # Try-import dei moduli backend: se non ancora pubblicati, fallback al mock.
 try:
     from cicerone.mcda import calcolo as mcda
@@ -103,6 +109,19 @@ def sidebar_stepper() -> None:
     step = st.session_state.step
     st.sidebar.title("Cicerone")
     st.sidebar.caption("Assessment AI Readiness")
+
+    # API key Anthropic (richiesta per diagnostica + report)
+    api_key = st.sidebar.text_input(
+        "Anthropic API Key",
+        type="password",
+        value=st.session_state.get("api_key", ""),
+        help="Necessaria per diagnostica LLM e report. Non viene salvata su disco.",
+        placeholder="sk-ant-api03-...",
+    )
+    if api_key:
+        st.session_state["api_key"] = api_key
+        set_api_key(api_key)
+
     st.sidebar.divider()
 
     fasi = [
@@ -229,7 +248,6 @@ def pagina_vincitore() -> None:
     classifica = mcda.classifica_framework(assessment_id)
     st.header("Framework più adatti")
     st.caption("Calcolo basato sulla matrice dei voti per i pesi che hai espresso.")
-    st.info("Nota: punteggio calcolato con un mock provvisorio in attesa del modulo MCDA.", icon=None)
 
     if not classifica:
         st.error("Nessun framework disponibile in DB.")
@@ -295,7 +313,8 @@ def pagina_diagnostica() -> None:
 
     # Domanda corrente
     if st.session_state.diag_domanda_corrente is None:
-        st.session_state.diag_domanda_corrente = llm_diag.next_question(assessment_id, None)
+        with st.spinner("Generazione domanda..."):
+            st.session_state.diag_domanda_corrente = llm_diag.next_question(assessment_id)
 
     domanda = st.session_state.diag_domanda_corrente
     if domanda is None:
@@ -313,7 +332,12 @@ def pagina_diagnostica() -> None:
         inviata = st.form_submit_button("Invia →", type="primary")
 
     if inviata and risposta.strip():
-        prossima = llm_diag.next_question(assessment_id, risposta.strip())
+        with st.spinner("Generazione prossima domanda..."):
+            prossima = llm_diag.next_question(
+                assessment_id,
+                domanda_precedente=domanda,
+                risposta_precedente=risposta.strip(),
+            )
         st.session_state.diag_domanda_corrente = prossima
         st.rerun()
 

@@ -14,13 +14,8 @@ API per UI:
 """
 from pathlib import Path
 
-from anthropic import Anthropic
-from dotenv import load_dotenv
-
 from cicerone.db import repository as repo
-
-load_dotenv()
-_client = Anthropic()
+from cicerone.llm._client import get_client
 
 MODEL = "claude-haiku-4-5-20251001"
 MAX_DOMANDE = 5
@@ -160,7 +155,7 @@ def next_question(
         framework_nome=framework["nomeFramework"] if framework else "Sconosciuto",
     )
 
-    resp = _client.messages.create(
+    resp = get_client().messages.create(
         model=MODEL,
         max_tokens=400,
         system=system,
