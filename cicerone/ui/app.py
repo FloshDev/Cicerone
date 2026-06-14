@@ -69,7 +69,7 @@ STYLE_CSS = Path(__file__).parent / "style.css"
 
 SHEET = "readiness"
 
-TAGLINE = "Il framework giusto per la tua AI, scelto bene."
+TAGLINE = "La voce che orienta la tua PMI nell'adozione dell'AI."
 
 LIVELLO_PESO = {
     "Fondamentale": 10.0,

@@ -1,6 +1,6 @@
 # Cicerone
 
-> La guida per la tua PMI nell'adozione dell'AI.
+> La voce che orienta la tua PMI nell'adozione dell'AI.
 
 **Cicerone** è un agente AI conversazionale che aiuta le PMI italiane ed
 europee a valutare la propria **AI Readiness/Maturity** scegliendo il
