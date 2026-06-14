@@ -134,3 +134,83 @@ collega farà la migration DB.
 
 Partiamo dal brainstorm flusso schermate. Cosa proponi come prima
 schermata e come transizione tra le fasi?
+
+---
+
+## Diario sessione UI — 2026-06-14
+
+### Cosa è stato fatto
+
+- **`cicerone/ui/_mock.py`** — mock locale del modulo MCDA.
+  - `classifica_framework(assessment_id) -> list[dict]`: somma `voto * peso_assessment` per ogni framework, ordina DESC.
+  - `breakdown_per_criterio(assessment_id, framework_id) -> list[dict]`: dettaglio voto/peso/contributo per criterio.
+  - Firma di `classifica_framework` allineata a quella attesa per `cicerone/mcda/calcolo.py`.
+
+- **`cicerone/ui/app.py`** — scheletro Streamlit completo, single-file.
+  - State machine in `st.session_state["step"] ∈ {onboarding, intervista, vincitore}`.
+  - **Onboarding**: form azienda (settore, fascia dipendenti, regione, uso AI attuale, fascia fatturato, note). Al submit salva `contesto_azienda` in session_state + `repo.crea_assessment('readiness')`.
+  - **Intervista**: un criterio per pagina (non lista lunga: meglio per UX guidata e prepara il futuro aggancio LLM). Definizione + select 5 livelli + textarea motivazione. Pre-compilazione da `get_pesi_assessment` (UPSERT del repository copre il replay). Bottoni Indietro/Avanti.
+  - **Vincitore**: top 3 con `st.metric`, tabella completa, dettaglio per criterio del framework scelto, expander con contesto azienda.
+  - Sidebar stepper (●/○ per le 3 fasi) + barra di progresso durante l'intervista + bottone "Ricomincia" (svuota solo session_state, lascia il DB).
+  - `bootstrap_schema()` idempotente prima del seed: necessario perché `connection.py` crea solo il file `.sqlite`, nessuno esegue `schema.sql` su DB fresco. Controlla `sqlite_master` per la tabella `Sheet` e applica `schema.sql` via `executescript` se assente.
+
+- **`.streamlit/config.toml`** — tema chiaro, accento ambrato `#E8B84B`, `gatherUsageStats = false`.
+
+### Mapping livello → peso (fisso)
+
+| Livello              | Peso |
+|----------------------|-----:|
+| Fondamentale         | 10.0 |
+| Importante           |  7.5 |
+| Abbastanza importante|  5.0 |
+| Poco importante      |  2.5 |
+| Non importante       |  0.0 |
+
+### Schema `contesto_azienda` proposto al collega DB
+
+**Decisione:** colonna JSON sulla `Assessment`, non tabella separata.
+
+```sql
+ALTER TABLE Assessment ADD COLUMN contesto_azienda TEXT;  -- JSON
+```
+
+Forma del JSON salvato dalla UI (oggi vive solo in `st.session_state`, finché la colonna non esiste):
+
+```json
+{
+  "settore": "Manifatturiero",
+  "fascia_dipendenti": "10-49",
+  "regione": "Lombardia",
+  "uso_ai_attuale": "Sì, in modo sporadico",
+  "fascia_fatturato": "500k - 2M €",
+  "note": null
+}
+```
+
+**Motivazione:** il contesto è denormalizzato per natura (campi opzionali, evolverà). La query principale è "leggi tutto il contesto di un assessment": una tabella separata complica senza guadagno reale. Quando il collega aggiunge la colonna basta esporre `repo.salva_contesto(assessment_id, dict)` e chiamarla a fine onboarding.
+
+### Cosa manca per integrare l'MCDA vero
+
+1. In `cicerone/ui/app.py` sostituire:
+   ```python
+   from cicerone.ui import _mock as mcda
+   ```
+   con:
+   ```python
+   from cicerone.mcda import calcolo as mcda
+   ```
+2. La firma `classifica_framework(assessment_id) -> list[{framework_id, nome, punteggio}]` è già rispettata dal mock.
+3. `breakdown_per_criterio` è un'aggiunta locale per il dettaglio: opzionale lato MCDA, può restare nella UI o migrare se utile.
+
+### Verifica
+
+- `uv run streamlit run cicerone/ui/app.py` → server up su `:8501`, HTTP 200.
+- Bootstrap schema + seed eseguiti automaticamente al primo accesso (10 criteri, 11 framework, 110 voti).
+- Navigazione onboarding → intervista → vincitore funzionante.
+
+### Vincoli rispettati
+
+- Nessun file toccato in `cicerone/db/` o `cicerone/mcda/`.
+- Nessuna dipendenza aggiunta al `pyproject.toml`.
+- Tutto accesso DB via `cicerone.db.repository` (l'unica eccezione è `bootstrap_schema()` lato UI, che usa `get_connection` per applicare `schema.sql` — non è uno SQL di dominio).
+
