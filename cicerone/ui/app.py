@@ -242,6 +242,7 @@ def blocco_api_key() -> None:
         st.session_state.api_key = api_key.strip()
         st.session_state.api_key_valida = ok
         st.session_state.api_key_messaggio = msg
+        st.rerun()  # re-render sidebar con stato aggiornato
     elif api_key and api_key.strip() != st.session_state.api_key:
         # Chiave modificata dopo verifica: invalida l'esito precedente
         st.session_state.api_key = api_key.strip()
@@ -301,17 +302,21 @@ def pagina_onboarding() -> None:
         )
 
         chiave_ok = st.session_state.api_key_valida is True
-        submit_disabled = not chiave_ok or not nome_azienda.strip()
+        # NB: dentro st.form, le variabili dei widget non si aggiornano live
+        # con la digitazione. Quindi NON usare nome_azienda per disabilitare
+        # il submit: validiamo on-submit e mostriamo errore se vuoto.
         submitted = st.form_submit_button(
             "Avvia intervista",
             type="primary",
-            disabled=submit_disabled,
+            disabled=not chiave_ok,
         )
 
     if not chiave_ok:
         st.info("Verifica prima la API key per abilitare l'avvio dell'intervista.")
-    elif not nome_azienda.strip():
-        st.info("Inserisci il nome dell'azienda per proseguire.")
+
+    if submitted and not nome_azienda.strip():
+        st.error("Inserisci il nome dell'azienda per proseguire.")
+        return
 
     if submitted and chiave_ok and nome_azienda.strip():
         st.session_state.contesto_azienda = {
