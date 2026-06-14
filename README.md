@@ -80,13 +80,6 @@ Criteri ReadinessMaturity.docx  # definizioni criteri
 
 ---
 
-## Documentazione
-
-- [`CICERONE_PLAN.md`](CICERONE_PLAN.md) — piano tecnico completo (Fase A) e report colleghi (Fase B)
-- [`CICERONE_CONTEXT.md`](CICERONE_CONTEXT.md) — contesto di sessione: decisioni di design, stato sviluppo
-
----
-
 ## Licenza
 
 Codice rilasciato sotto licenza [MIT](LICENSE).

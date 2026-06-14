@@ -21,6 +21,10 @@ cicerone/data/reports/
 # clonato a parte dentro knowledge/)
 knowledge/
 
+# Documentazione di progetto interna (non distribuita su repo pubblico)
+CICERONE_CONTEXT.md
+CICERONE_PLAN.md
+
 # Editor / OS
 .DS_Store
 .idea/
