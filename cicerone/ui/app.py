@@ -12,7 +12,26 @@ import streamlit as st
 from cicerone.db import repository as repo
 from cicerone.db import seed
 from cicerone.db.connection import get_connection
-from cicerone.ui import _mock as mcda
+from cicerone.ui import _mock
+
+# Try-import dei moduli backend: se non ancora pubblicati, fallback al mock.
+try:
+    from cicerone.mcda import calcolo as mcda
+except ImportError:
+    mcda = _mock
+
+try:
+    from cicerone.llm import diagnostica as llm_diag
+except ImportError:
+    llm_diag = _mock
+
+try:
+    from cicerone.llm import report as llm_report
+except ImportError:
+    llm_report = _mock
+
+# salva_contesto: prova nel repository (round 2), fallback al mock no-op
+salva_contesto = getattr(repo, "salva_contesto", _mock.salva_contesto)
 
 SCHEMA_SQL = Path(__file__).parent.parent / "db" / "schema.sql"
 
@@ -69,6 +88,9 @@ def init_state() -> None:
     st.session_state.setdefault("assessment_id", None)
     st.session_state.setdefault("criteri", None)
     st.session_state.setdefault("idx_criterio", 0)
+    st.session_state.setdefault("diag_domanda_corrente", None)
+    st.session_state.setdefault("diag_risposta_input", "")
+    st.session_state.setdefault("report_markdown", None)
 
 
 def get_criteri() -> list[dict]:
@@ -87,6 +109,8 @@ def sidebar_stepper() -> None:
         ("onboarding", "Azienda"),
         ("intervista", "Intervista criteri"),
         ("vincitore", "Framework vincitore"),
+        ("diagnostica", "Diagnostica"),
+        ("report", "Report finale"),
     ]
     for key, label in fasi:
         marker = "●" if key == step else "○"
@@ -101,7 +125,8 @@ def sidebar_stepper() -> None:
 
     st.sidebar.divider()
     if st.sidebar.button("Ricomincia"):
-        for k in ("step", "contesto_azienda", "assessment_id", "criteri", "idx_criterio"):
+        for k in ("step", "contesto_azienda", "assessment_id", "criteri", "idx_criterio",
+                  "diag_domanda_corrente", "diag_risposta_input", "report_markdown"):
             st.session_state.pop(k, None)
         st.rerun()
 
@@ -133,6 +158,7 @@ def pagina_onboarding() -> None:
             "note": note.strip() or None,
         }
         st.session_state.assessment_id = repo.crea_assessment(SHEET)
+        salva_contesto(st.session_state.assessment_id, st.session_state.contesto_azienda)
         st.session_state.step = "intervista"
         st.session_state.idx_criterio = 0
         st.rerun()
@@ -247,6 +273,77 @@ def pagina_vincitore() -> None:
     with st.expander("Contesto azienda registrato"):
         st.json(st.session_state.contesto_azienda or {})
 
+    st.divider()
+    if st.button("Continua alla diagnostica →", type="primary"):
+        st.session_state.step = "diagnostica"
+        st.session_state.diag_domanda_corrente = None
+        st.rerun()
+
+
+def pagina_diagnostica() -> None:
+    assessment_id = st.session_state.assessment_id
+    st.header("Diagnostica guidata")
+    st.caption("Rispondi alle domande per personalizzare il report finale.")
+
+    # Storia Q&A precedenti (dal DB)
+    storia = _mock.storia_diagnostica(assessment_id) if hasattr(_mock, "storia_diagnostica") else []
+    for qa in storia:
+        with st.chat_message("assistant"):
+            st.markdown(qa["domanda"])
+        with st.chat_message("user"):
+            st.markdown(qa["risposta_utente"])
+
+    # Domanda corrente
+    if st.session_state.diag_domanda_corrente is None:
+        st.session_state.diag_domanda_corrente = llm_diag.next_question(assessment_id, None)
+
+    domanda = st.session_state.diag_domanda_corrente
+    if domanda is None:
+        st.success("Diagnostica completata.")
+        if st.button("Genera il report →", type="primary"):
+            st.session_state.step = "report"
+            st.rerun()
+        return
+
+    with st.chat_message("assistant"):
+        st.markdown(domanda)
+
+    with st.form("diagnostica_risposta", clear_on_submit=True):
+        risposta = st.text_area("La tua risposta", height=120)
+        inviata = st.form_submit_button("Invia →", type="primary")
+
+    if inviata and risposta.strip():
+        prossima = llm_diag.next_question(assessment_id, risposta.strip())
+        st.session_state.diag_domanda_corrente = prossima
+        st.rerun()
+
+
+def pagina_report() -> None:
+    assessment_id = st.session_state.assessment_id
+    st.header("Report finale")
+
+    if st.session_state.report_markdown is None:
+        with st.spinner("Generazione del report in corso..."):
+            st.session_state.report_markdown = llm_report.genera_report(assessment_id)
+
+    markdown = st.session_state.report_markdown
+    st.markdown(markdown)
+
+    col_dl, col_new = st.columns(2)
+    with col_dl:
+        st.download_button(
+            "Scarica report .md",
+            markdown,
+            file_name=f"report_cicerone_{assessment_id}.md",
+            mime="text/markdown",
+        )
+    with col_new:
+        if st.button("Nuovo assessment"):
+            for k in ("step", "contesto_azienda", "assessment_id", "criteri", "idx_criterio",
+                      "diag_domanda_corrente", "diag_risposta_input", "report_markdown"):
+                st.session_state.pop(k, None)
+            st.rerun()
+
 
 # ---------- entry point ----------
 
@@ -264,6 +361,10 @@ def main() -> None:
         pagina_intervista()
     elif step == "vincitore":
         pagina_vincitore()
+    elif step == "diagnostica":
+        pagina_diagnostica()
+    elif step == "report":
+        pagina_report()
     else:
         st.error(f"Stato sconosciuto: {step}")
 
