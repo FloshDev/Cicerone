@@ -499,3 +499,54 @@ Quando finisci tutto, appendi in fondo a questo file una nota
 Così l'altra istanza Claude (e l'utente) sanno cosa è cambiato. Push a fine
 lavoro.
 
+---
+
+## ROUND 3 — diario UI (2026-06-15)
+
+### File modificati / creati
+
+- **`cicerone/ui/style.css`** (nuovo) — foglio di stile iniettato in `<style>` dalla UI.
+  - Import Cormorant Garamond (Google Fonts) per header/sidebar/divider.
+  - Variabili CSS: `--cic-amber: #E8B84B`, `--cic-amber-dark: #C99B30`, `--cic-text-muted: #7A7A7A`, `--cic-border`, `--cic-error #E85B4B`, `--cic-success #4BE87A`.
+  - Classi: `cic-header`, `cic-tagline`, `cic-sidebar-title`, `cic-sidebar-caption`, `cic-divider`, `cic-step`/`cic-step-num`/`cic-step-label`, `cic-badge` (`-ok`/`-ko`/`-idle`), `cic-key-ok`/`cic-key-ko`.
+  - Override mirati: bottoni `kind="primary"` ambrati con testo nero, `[data-testid="stChatMessage"]` con bordo sottile + padding generoso, sidebar border-right ambrato 1px.
+
+- **`cicerone/ui/app.py`** (rifatto) — restyle + nuove feature.
+  - **Header**: `header_cicerone()` con wordmark serif "Cicerone" + sottile underline ambrato + tagline italica `Il framework giusto per la tua AI, scelto bene.`
+  - **Sidebar**: rimosso text_input API key, ora solo wordmark serif + badge stato chiave (ok/ko/idle), stepper a numeri romani I-V (ambrato per attivo, grigio per inattivo), divider `─── · ───`, progresso intervista, bottone Ricomincia.
+  - **API key in pagina onboarding** (sezione "Configurazione"): text_input password + bottone "Verifica chiave" → call `client.messages.create(model="claude-haiku-4-5-20251001", max_tokens=10, "ping")`. Esito salvato in `api_key_valida` (None/True/False). Modifica chiave dopo verifica → invalida automaticamente. Bottone "Avvia intervista" disabilitato finché chiave non valida.
+  - **Onboarding nuovi campi**: `nome_azienda` (text_input obbligatorio), `nazione` (dropdown EU 27 + UK + Svizzera, default Italia), `regione` (text_input opzionale "Regione/Cantone/Stato — opzionale"). Rimosso vecchio dropdown REGIONI italiane. Aggiornato dict `contesto_azienda` con i nuovi campi.
+  - **Intervista**: `st.chat_input` al posto di `st.form + text_area + form_submit_button`. Bottone "← Indietro" in colonna sopra l'input (chat_input è sticky-bottom in Streamlit). Placeholder dinamico: "Vai al calcolo: scrivi la tua ultima risposta..." sull'ultimo criterio.
+  - **Diagnostica**: stesso pattern chat_input.
+  - **Spinner contestuali**: "Sto formulando la domanda adatta al tuo contesto...", "Sto interpretando la tua risposta...", "Sto generando la prossima domanda...", "Sto verificando la chiave con un ping ad Anthropic..."
+  - **Report**: `st.status` (con `expanded=True` durante esecuzione, `complete` a fine) al posto del semplice `st.spinner`, con log step ("Raccolgo i pesi...", "Invoco il modello...", "Report pronto.").
+  - **Divisori**: `divider_cicerone()` con `─── · ───` in `cic-divider`, usato al posto di `st.divider()`.
+
+### Decisioni di design prese da solo
+
+- **Font**: Cormorant Garamond (Google Fonts, free) — equilibrio classico/moderno, ottimo display al wordmark. Fallback `Garamond`/`Libre Caslon Text`/`serif`.
+- **Bordo sidebar**: 1px ambrato solo a destra, niente shadow né altri accenti.
+- **Bubble chat**: niente sfondo ne ombre, solo bordo sottile + padding 1rem.
+- **`storia_diagnostica`**: tengo l'implementazione in `_mock.py` (query diretta su `Diagnostica`) perché il backend non espone una funzione pubblica equivalente. È solo lettura del DB condiviso, semantica coerente con storia messaggi.
+- **Reset auto API key**: se l'utente modifica la chiave dopo aver verificato, `api_key_valida` torna a `None` per forzare nuova verifica.
+
+### Workaround hot
+
+Il backend espone `cicerone.db.repository._ensure_contesto_column()` che gira al **load del modulo** e fa `ALTER TABLE Assessment ADD COLUMN contesto_azienda`. Su DB fresco (tabelle non ancora create) l'ALTER esplode con `sqlite3.OperationalError: no such table: Assessment`. Non posso toccare `cicerone/db/` per vincolo round 3.
+
+Workaround lato UI: in `app.py` chiamo `_bootstrap_schema_eager()` PRIMA dell'import `from cicerone.db import repository`. Il bootstrap legge `cicerone/db/schema.sql` e lo applica solo se la tabella `Sheet` non esiste. Idempotente. Ordine import obbliga a `# noqa: E402`.
+
+Da segnalare al backend: spostare la migration fuori dal load del modulo (es. funzione esplicita richiamata dopo l'init dello schema) per evitare ordini di import fragili.
+
+### Cosa rimane aperto
+
+- **Watchdog**: Streamlit suggerisce `pip install watchdog` per performance file-watching. Non aggiunto perché vincolo "no dipendenze senza chiedere". Trascurabile in prod.
+- **Animazioni hover bottoni**: oltre al cambio colore, nessuna transizione. Sufficiente per il claim "minimal".
+- **Mobile**: sidebar e chat_input testati solo su desktop. Streamlit gestisce reflow automatico, ma il wordmark 3.2rem potrebbe essere stretto su < 360px — non considerato priorità.
+- **Test end-to-end con LLM reali**: non lanciato (richiede API key utente). Solo smoke test (HTTP 200, import senza eccezioni, moduli backend agganciati). UX da validare a mano con il browser.
+
+### Verifica
+
+- `python -c "from cicerone.ui import app"` con DB fresco → OK, nessuna eccezione, tutti i moduli backend importati (mcda/llm.diagnostica/llm.report/llm.intervista/repo.salva_contesto).
+- `uv run streamlit run cicerone/ui/app.py` → HTTP 200 su `:8501`.
+

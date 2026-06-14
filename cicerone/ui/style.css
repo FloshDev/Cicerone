@@ -1,0 +1,149 @@
+/* Cicerone — identità visiva minimal
+   Accento ambrato unico, font serif per header, divisori sottili. */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+:root {
+    --cic-amber: #E8B84B;
+    --cic-amber-dark: #C99B30;
+    --cic-text-muted: #7A7A7A;
+    --cic-border: rgba(58, 58, 58, 0.3);
+    --cic-error: #E85B4B;
+    --cic-success: #4BE87A;
+}
+
+/* Header principale dell'app — il "wordmark" */
+.cic-header {
+    font-family: 'Cormorant Garamond', Garamond, 'Libre Caslon Text', serif;
+    font-weight: 500;
+    font-size: 3.2rem;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    margin: 0 0 0.2rem 0;
+    display: inline-block;
+    border-bottom: 2px solid var(--cic-amber);
+    padding-bottom: 0.15rem;
+}
+
+.cic-tagline {
+    font-family: 'Cormorant Garamond', Garamond, serif;
+    font-style: italic;
+    color: var(--cic-text-muted);
+    font-size: 1.1rem;
+    margin: 0.2rem 0 1.6rem 0;
+}
+
+/* Sidebar wordmark */
+.cic-sidebar-title {
+    font-family: 'Cormorant Garamond', Garamond, serif;
+    font-weight: 500;
+    font-size: 1.9rem;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    margin: 0 0 0.1rem 0;
+}
+
+.cic-sidebar-caption {
+    font-family: 'Cormorant Garamond', Garamond, serif;
+    font-style: italic;
+    color: var(--cic-text-muted);
+    font-size: 0.95rem;
+    margin: 0 0 1rem 0;
+}
+
+/* Divisore in stile classico: ─── · ─── */
+.cic-divider {
+    text-align: center;
+    color: var(--cic-text-muted);
+    font-size: 0.95rem;
+    letter-spacing: 0.4em;
+    margin: 1.4rem 0;
+    user-select: none;
+}
+
+/* Bordo sottile sulla sidebar */
+[data-testid="stSidebar"] {
+    border-right: 1px solid var(--cic-amber);
+}
+
+/* Bottoni primary — sfondo ambrato, testo nero */
+.stButton > button[kind="primary"],
+.stFormSubmitButton > button[kind="primary"],
+.stDownloadButton > button[kind="primary"] {
+    background-color: var(--cic-amber);
+    color: #111;
+    border: 1px solid var(--cic-amber);
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.stButton > button[kind="primary"]:hover,
+.stFormSubmitButton > button[kind="primary"]:hover,
+.stDownloadButton > button[kind="primary"]:hover {
+    background-color: var(--cic-amber-dark);
+    border-color: var(--cic-amber-dark);
+    color: #111;
+}
+
+/* Bottoni secondari sobri */
+.stButton > button:not([kind="primary"]) {
+    border-radius: 6px;
+}
+
+/* Bubble chat — bordo sottile, padding generoso, no ombra forte */
+[data-testid="stChatMessage"] {
+    border: 1px solid var(--cic-border);
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    box-shadow: none;
+    background: transparent;
+}
+
+/* Stepper sidebar: numeri romani */
+.cic-step {
+    display: flex;
+    align-items: baseline;
+    gap: 0.8rem;
+    margin: 0.35rem 0;
+    font-size: 0.95rem;
+}
+
+.cic-step-num {
+    font-family: 'Cormorant Garamond', Garamond, serif;
+    font-weight: 500;
+    font-size: 1.15rem;
+    min-width: 1.8rem;
+    text-align: right;
+    color: var(--cic-text-muted);
+}
+
+.cic-step.cic-active .cic-step-num {
+    color: var(--cic-amber);
+}
+
+.cic-step.cic-active .cic-step-label {
+    color: inherit;
+    font-weight: 600;
+}
+
+.cic-step:not(.cic-active) .cic-step-label {
+    color: var(--cic-text-muted);
+}
+
+/* Badge stato API key in sidebar */
+.cic-badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    border: 1px solid currentColor;
+}
+
+.cic-badge-ok    { color: var(--cic-success); }
+.cic-badge-ko    { color: var(--cic-error); }
+.cic-badge-idle  { color: var(--cic-text-muted); }
+
+/* Esito verifica chiave sotto il bottone */
+.cic-key-ok { color: var(--cic-success); font-weight: 500; }
+.cic-key-ko { color: var(--cic-error); font-weight: 500; }
