@@ -18,9 +18,9 @@ from cicerone.db import repository as repo
 from cicerone.llm._client import get_client
 
 MODEL = "claude-haiku-4-5-20251001"
-MAX_DOMANDE = 7  # include eventuali re-domande
+MAX_DOMANDE = 5  # cap su domande "vere" (escluse re-ask)
 MIN_DOMANDE = 3
-MAX_RIASK = 2  # cap totale re-domande nella sessione
+MAX_RIASK = 3  # cap totale re-domande nella sessione, in ADDITION a MAX_DOMANDE
 RIASK_TAG = "[RIASK]"
 
 KNOWLEDGE_DIR = Path(__file__).parent.parent.parent / "knowledge" / "frameworks"
@@ -172,11 +172,13 @@ def next_question(
     # 3. Considera solo diagnostiche già "risposte" per cap e storia
     diags_risposte = [d for d in diags if d["risposta_utente"]]
 
-    if len(diags_risposte) >= MAX_DOMANDE:
-        return None
-
     n_riask = sum(1 for d in diags_risposte if d["domanda"].lstrip().startswith(RIASK_TAG))
+    n_non_riask = len(diags_risposte) - n_riask
     riask_disponibili = max(0, MAX_RIASK - n_riask)
+
+    # Cap su domande "vere" (le re-ask non contano qui)
+    if n_non_riask >= MAX_DOMANDE:
+        return None
 
     # 4. Build messages: ricostruisce storia conversazione (solo risposte)
     messages = []
@@ -213,7 +215,7 @@ def next_question(
     testo = resp.content[0].text.strip()
 
     # 5. Check STOP
-    if testo.upper().startswith("STOP") and len(diags_risposte) >= MIN_DOMANDE:
+    if testo.upper().startswith("STOP") and n_non_riask >= MIN_DOMANDE:
         return None
 
     # 6. Se [RIASK] usato oltre il cap, downgrade a domanda normale (toglie tag)

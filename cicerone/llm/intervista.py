@@ -60,32 +60,49 @@ Genera la domanda."""
 
 
 def parse_risposta(criterio: dict, contesto: dict | None,
-                   risposta_libera: str) -> dict:
-    """Parsa risposta utente in livello/peso/motivazione/ambiguo.
+                   risposta_libera: str, is_retry: bool = False) -> dict:
+    """Parsa risposta utente in livello/peso/motivazione/ambiguo,
+    o richiede chiarimento se l'utente non ha capito / risposta inutilizzabile.
 
-    Ritorna dict:
-        - livello: str (uno dei 5 livelli ammessi)
-        - peso: float (mapping fisso)
-        - motivazione: str (sintesi pulita risposta)
-        - ambiguo: bool (True se LLM non sicuro dell'inferenza)
+    Se `is_retry=False` e la risposta è palesemente non-comprensione
+    (es. "non ho capito", "boh", "non saprei", domanda di rimando, vuoto):
+        ritorna {"needs_clarification": True,
+                 "clarification_question": "<riformulazione semplificata>"}
+
+    Altrimenti ritorna:
+        {"needs_clarification": False,
+         "livello": str,
+         "peso": float,
+         "motivazione": str,
+         "ambiguo": bool}
+
+    Se `is_retry=True` e la risposta è ancora vaga, accetta best-effort
+    (ambiguo=True) e prosegue.
     """
     livelli = list(LIVELLO_PESO.keys())
 
-    system = f"""Sei un parser strutturato. Devi inferire l'importanza che
-un'azienda attribuisce a un criterio MCDA, basandoti sulla sua risposta libera.
+    system = f"""Sei un parser strutturato per un'intervista AI Readiness.
+Devi analizzare la risposta libera di un utente a una domanda su un criterio
+MCDA, e DECIDERE una di queste due strade:
 
-Devi assegnare ESATTAMENTE uno di questi 5 livelli:
-{chr(10).join(f"- {l}" for l in livelli)}
+A) Se la risposta è inutilizzabile per inferire l'importanza del criterio
+   (esempi: "non ho capito", "boh", "non saprei", "che vuol dire?", risposta
+   vuota, risposta che chiede chiarimento sulla domanda, parole sole tipo
+   "abbastanza" senza contesto):
+   → ritorna `{{"needs_clarification": true,
+                "clarification_question": "<una riformulazione MOLTO più
+                semplice e concreta della domanda, max 2 righe, in italiano,
+                con un esempio concreto adatto al settore se possibile>"}}`
 
-Output: SOLO JSON valido, niente altro, questa struttura esatta:
-{{
-  "livello": "<uno dei 5 livelli>",
-  "motivazione": "<sintesi 1-2 frasi della risposta utente>",
-  "ambiguo": <true|false>
-}}
+B) Se la risposta contiene informazione utile (anche imperfetta):
+   → ritorna `{{"needs_clarification": false,
+                "livello": "<uno di: {', '.join(livelli)}>",
+                "motivazione": "<sintesi 1-2 frasi della risposta utente>",
+                "ambiguo": <true se l'inferenza è incerta, false altrimenti>}}`
 
-"ambiguo": true SE la risposta è troppo vaga, evasiva o contraddittoria per
-inferire un livello con sicurezza. Altrimenti false."""
+{'IMPORTANTE: questo è il SECONDO tentativo. Anche se la risposta è ancora vaga, NON usare ramo A. Usa ramo B con ambiguo=true, scegliendo il livello che meglio approssima.' if is_retry else ''}
+
+Output: SOLO JSON valido, niente altro."""
 
     user = f"""Criterio: {criterio['nomeCriterio']}
 Definizione: {criterio['definizione']}
@@ -96,17 +113,16 @@ Risposta libera dell'utente:
 {risposta_libera}
 \"\"\"
 
-Parsa in JSON."""
+Decidi ramo A o B e ritorna il JSON."""
 
     resp = get_client().messages.create(
         model=MODEL,
-        max_tokens=400,
+        max_tokens=500,
         system=system,
         messages=[{"role": "user", "content": user}],
     )
     testo = resp.content[0].text.strip()
 
-    # Strip eventuali code fence
     if testo.startswith("```"):
         testo = testo.split("```")[1]
         if testo.startswith("json"):
@@ -114,15 +130,27 @@ Parsa in JSON."""
         testo = testo.strip()
 
     parsed = json.loads(testo)
-    livello = parsed["livello"]
+
+    # Ramo A: chiarimento
+    if parsed.get("needs_clarification") and not is_retry:
+        return {
+            "needs_clarification": True,
+            "clarification_question": parsed.get(
+                "clarification_question",
+                "Mi spiego meglio: quanto è importante questo aspetto per la tua azienda, su una scala da 'per nulla' a 'fondamentale'?",
+            ).strip(),
+        }
+
+    # Ramo B: parse normale (anche se LLM tentava chiarimento ma è retry)
+    livello = parsed.get("livello") or "Abbastanza importante"
     if livello not in LIVELLO_PESO:
-        # Fallback: best-effort match case-insensitive
         match = next((l for l in livelli if l.lower() == livello.lower()), None)
         livello = match or "Abbastanza importante"
 
     return {
+        "needs_clarification": False,
         "livello": livello,
         "peso": LIVELLO_PESO[livello],
         "motivazione": parsed.get("motivazione", "").strip(),
-        "ambiguo": bool(parsed.get("ambiguo", False)),
+        "ambiguo": bool(parsed.get("ambiguo", True if is_retry else False)),
     }
