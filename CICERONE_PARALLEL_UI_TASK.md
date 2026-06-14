@@ -304,3 +304,198 @@ Il professore vuole la demo entro 3h. Modalità vibe coding pura:
 
 Buon lavoro.
 
+---
+
+## ROUND 3 — feedback post-demo (2026-06-15)
+
+Ciao Claude. Demo finita, raccolto feedback dal docente. Tu lavori SOLO su
+UI/UX e identità visiva. L'altra istanza Claude lavora sul backend in parallelo
+(diagnostica + report) e NON va toccato.
+
+Leggi prima `cicerone/ui/app.py` e `.streamlit/config.toml` per contesto.
+
+### Identità del prodotto
+
+Il prodotto si chiama **Cicerone**. Riferimento esplicito a Marco Tullio
+Cicerone — oratore, filosofo, retore romano. Identità da incarnare:
+- **Eloquenza**: tono colto ma accessibile, mai burocratico
+- **Misura**: minimalismo, niente decorazioni inutili, spazi ampi
+- **Autorevolezza sobria**: un solo accento cromatico (ambrato), tipografia
+  curata, divisori netti
+- **Classicità**: piccoli rimandi senza essere caricaturali (es. divider
+  con linea sottile e punto centrale `─── · ───`, tagline latina opzionale
+  tipo "Consulens prudentia"). NIENTE colonne doriche, busti, allori,
+  emoji togati. Sobrio.
+
+Non riscrivere da zero — è già un'app funzionante. Restyle mirato.
+
+### Cosa fa il backend (NON toccare lato tuo)
+
+- `cicerone/llm/diagnostica.py`: aggiunge logica re-domanda su risposte vaghe
+  (max 1 re-domanda per topic, poi prosegue)
+- `cicerone/llm/report.py`: restyle prompt
+  - Titolo include framework vincente
+  - KPI con descrizione/perché/come misurare
+  - Rimossa sezione "Riepilogo punteggi"
+  - Roadmap con priorità P1/P2/P3 + motivazione
+- Repository: nessun cambio schema. `contesto_azienda` dict accoglie i nuovi
+  campi liberamente (è JSON blob)
+
+### Cosa fai TU (UI/UX, solo `cicerone/ui/`)
+
+#### 1. Identità visiva — restyle minimale con carattere
+
+Obiettivo: l'app deve "sembrare Cicerone", non un form generico Streamlit.
+Restando minimal.
+
+Palette (rispetta il design system globale dell'utente):
+- Accento primario: `#E8B84B` (ambrato) — UN SOLO accento per schermata
+- Testo principale: lascia default Streamlit (light theme già configurato)
+- Testo secondario / hint: `#7A7A7A`
+- Bordi e divisori: `#3A3A3A` con opacità 0.3
+- Errore: `#E85B4B` | Successo: `#4BE87A`
+- Sfondo: NON impostare colori espliciti, lascia tema
+
+Interventi concreti (CSS custom via `st.markdown(..., unsafe_allow_html=True)`
+in cima all'app, o file `cicerone/ui/style.css` letto e iniettato):
+
+1. **Header app**: testo "Cicerone" in font serif (Garamond, EB Garamond,
+   Cormorant, Libre Caslon, ecc. — uno disponibile via Google Fonts o
+   fallback `serif`), peso medium, accento ambrato sotto come sottile
+   underline. Tagline subito sotto in italico grigio:
+   _"Il framework giusto per la tua AI, scelto bene."_
+2. **Divisori**: sostituisci `st.divider()` con riga sottile + simbolo
+   centrale `─── · ───` in `#7A7A7A`
+3. **Bottoni primary**: sfondo ambrato `#E8B84B`, testo nero, bordo
+   arrotondato leggero, hover più scuro
+4. **Sidebar**: titolo "Cicerone" stesso font serif, bordo destro 1px
+   ambrato
+5. **Bubble chat**: bordo sottile, padding generoso, no shadow forte
+6. **Stepper sidebar**: sostituisci `●/○` con qualcosa di più tipografico,
+   ad esempio numeri romani in ambrato per la fase attiva (I, II, III,
+   IV, V) e in grigio per le altre
+
+NON usare: emoji decorative, icone grafiche, colonne doriche, allori,
+gradient, ombre marcate, colori secondari oltre ambrato.
+
+Verifica: l'app deve restare leggibile e veloce, niente animazioni pesanti.
+
+#### 2. Spinner / caricamento (priorità alta)
+
+I `st.spinner(...)` esistono già nel codice ma sono i default Streamlit
+(spinner anonimo). Migliorare:
+- Messaggi contestuali ("Sto generando la prossima domanda...",
+  "Sto interpretando la tua risposta...", "Sto preparando il report
+  finale, possono volerci 20-30 secondi...")
+- Considera `st.status(...)` per chiamate lunghe (report) con log step
+- Eventuale skeleton/placeholder bubble durante attesa LLM
+
+#### 3. Chat UI con invio (priorità alta)
+
+Sia in `pagina_intervista` che `pagina_diagnostica`:
+- Sostituire `st.form` + `st.text_area` + bottone `st.form_submit_button`
+  con `st.chat_input(...)` (Enter invia, look chat nativo)
+- Bubble: continua a usare `st.chat_message("assistant"|"user")` ma
+  considera custom styling (vedi punto 1)
+- Per intervista: serve ancora bottone "Indietro" (separato dall'input
+  chat) — soluzione: due colonne, sx bottone, dx input chat? O bottone
+  sopra/sotto?
+
+#### 4. API key in cima + feedback (priorità alta)
+
+Sposta API key da sidebar a **primo blocco della pagina onboarding**, prima
+di ogni altro campo. Resta in `st.session_state["api_key"]` ma più
+visibile.
+
+UI:
+- Titolo "Configurazione" prima di "Profilo azienda"
+- `st.text_input("Anthropic API Key", type="password", ...)`
+- Subito sotto bottone "Verifica chiave"
+- Sotto bottone: badge esito
+  - Vuoto se mai verificato
+  - Verde "✓ Chiave valida" se OK
+  - Rosso "✗ Errore: <messaggio>" se KO
+  - Salva esito in `st.session_state["api_key_valida"]` (bool)
+- Disabilita bottone "Avvia intervista" finché `api_key_valida is True`
+- Sidebar: mostra solo badge stato chiave, non più il campo
+
+**Test chiave (call API leggera)**:
+```python
+from cicerone.llm._client import set_api_key, get_client
+
+def verifica_chiave(api_key: str) -> tuple[bool, str]:
+    set_api_key(api_key)
+    try:
+        get_client().messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=10,
+            messages=[{"role": "user", "content": "ping"}],
+        )
+        return True, "Chiave valida."
+    except Exception as e:
+        return False, f"{type(e).__name__}: {str(e)[:200]}"
+```
+Costo: ~$0.0001 a verifica. Trascurabile.
+
+#### 5. Onboarding nuovi campi
+
+- **Nome azienda** (text input obbligatorio, primo dopo API key)
+- **Nazione** (dropdown obbligatorio, lista qui sotto)
+- **Regione** (text input opzionale, label adatta "Regione/Cantone/Stato — opzionale")
+
+Lista nazioni (EU 27 + Svizzera + UK), ordine alfabetico italiano:
+```python
+NAZIONI_EUROPA = [
+    "Austria", "Belgio", "Bulgaria", "Cechia", "Cipro", "Croazia",
+    "Danimarca", "Estonia", "Finlandia", "Francia", "Germania", "Grecia",
+    "Irlanda", "Italia", "Lettonia", "Lituania", "Lussemburgo", "Malta",
+    "Paesi Bassi", "Polonia", "Portogallo", "Regno Unito", "Romania",
+    "Slovacchia", "Slovenia", "Spagna", "Svezia", "Svizzera", "Ungheria",
+]
+```
+
+Default: "Italia". Rimuovi vecchio dropdown `REGIONI` italiane.
+
+Aggiorna struttura `contesto_azienda` (JSON blob, no migration DB):
+```python
+{
+    "nome_azienda": "...",
+    "settore": "...",
+    "fascia_dipendenti": "...",
+    "nazione": "...",
+    "regione": "..." | None,
+    "uso_ai_attuale": "...",
+    "fascia_fatturato": "...",
+    "note": "..." | None,
+}
+```
+
+Backend leggerà i nuovi campi (è solo dict, niente da modificare lato DB).
+
+### Vincoli round 3
+
+- ❌ NON toccare `cicerone/llm/` (backend ci lavora)
+- ❌ NON toccare `cicerone/db/` o `cicerone/mcda/` (stabili)
+- ✅ Solo `cicerone/ui/` e `.streamlit/`
+- ✅ Commit + push frequenti per non bloccare backend (che a sua volta
+  pulla per verificare integrazione)
+
+### Ordine consigliato
+
+1. API key in cima + feedback (#4, sblocca subito UX)
+2. Onboarding nuovi campi (#5, dati per backend)
+3. Chat input con invio (#3, UX percepita)
+4. Identità visiva minimal (#1, polish)
+5. Spinner contestuali (#2, ultimo perché tocca più punti)
+
+### Cosa scrivere in diario di sessione
+
+Quando finisci tutto, appendi in fondo a questo file una nota
+`## ROUND 3 — diario UI (data)` con:
+- File modificati e cosa hai fatto
+- Eventuali decisioni di design prese da solo
+- Cosa rimane aperto
+
+Così l'altra istanza Claude (e l'utente) sanno cosa è cambiato. Push a fine
+lavoro.
+
