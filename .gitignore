@@ -35,3 +35,9 @@ CICERONE_PLAN.md
 # Excel lockfiles
 ~$*.xlsx
 ~$*.docx
+
+# Build artefatti packaging desktop (PyInstaller + .dmg)
+build/
+dist/
+packaging/icon.iconset/
+*.spec.bak

@@ -22,3 +22,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["cicerone"]
+
+[dependency-groups]
+packaging = [
+    "pyinstaller>=6.21.0",
+    "pywebview>=6.2.1",
+]

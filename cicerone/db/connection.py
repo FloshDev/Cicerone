@@ -1,7 +1,12 @@
+import os
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "data" / "cicerone.sqlite"
+DB_PATH = (
+    Path(os.environ["CICERONE_DB_PATH"])
+    if os.environ.get("CICERONE_DB_PATH")
+    else Path(__file__).parent.parent / "data" / "cicerone.sqlite"
+)
 
 
 def get_connection() -> sqlite3.Connection:

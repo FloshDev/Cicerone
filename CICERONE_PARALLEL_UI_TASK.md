@@ -1006,3 +1006,58 @@ non converge per X" che insistere alla cieca.
 Buon lavoro. Niente vibe-build alla cieca: leggi gli errori di PyInstaller
 con attenzione, sono verbosi ma puntano al file mancante esatto.
 
+
+## ROUND 5 — diario packaging (2026-06-15, pomeriggio)
+
+### File creati / modificati
+
+File creati:
+- `cicerone/desktop.py` — launcher pywebview + streamlit in-process (thread daemon). Vedi nota signal monkey-patch sotto.
+- `packaging/cicerone.spec` — spec PyInstaller one-folder.
+- `packaging/icon.icns` — placeholder 1024x1024 generato con Pillow + `iconutil` (cerchio ambrato + "C" serif su crema).
+- `packaging/icon.iconset/` — PNG a 9 risoluzioni (16-1024 incluse @2x).
+- `packaging/build.sh` — orchestrazione `pyinstaller` + `create-dmg` (con fallback `hdiutil`).
+- `packaging/README.md` — istruzioni build + warning Gatekeeper + path dati utente.
+
+File modificati:
+- `cicerone/db/connection.py` — UNICA eccezione ai vincoli del round: aggiunto override via `os.environ["CICERONE_DB_PATH"]` per spostare il DB in una location scrivibile quando si gira dentro `.app`. In dev (senza env var) comportamento invariato.
+- `pyproject.toml` + `uv.lock` — `uv add --group packaging pywebview pyinstaller`. Gruppo separato, NON nelle runtime deps.
+
+### Cosa è stato fatto
+
+- Scritto `desktop.py` che avvia streamlit in-process dentro un thread daemon e apre una finestra pywebview sul `127.0.0.1:PORTA`. Niente subprocess separato (vedi pitfall 1).
+- Generata icona placeholder con Pillow → `iconset` con 9 PNG → `iconutil -c icns` per produrre `icon.icns`.
+- Scritto `cicerone.spec` PyInstaller one-folder con `datas` per `app.py`, `Criteri_Readiness_Maturity.md`, metadata dei pacchetti che leggono `importlib.metadata`, e `hiddenimports = collect_submodules("cicerone")`.
+- Scritto `build.sh` che fa `pyinstaller packaging/cicerone.spec`, poi tenta `create-dmg` con layout curato e in caso di assenza ricade su `hdiutil` con staging dir (copia `.app` + symlink `/Applications`).
+- Scritto `packaging/README.md` con comandi build, prima apertura (Apri comunque per Gatekeeper), path DB utente.
+- Build completata: `.app` 231 MB, `.dmg` 102 MB.
+
+### Pitfall colpiti e fix
+
+1. **Fork bomb del subprocess** — il primo `desktop.py` lanciava `sys.executable -m streamlit run`. Dentro il bundle PyInstaller `sys.executable` punta a `.../Contents/MacOS/cicerone` (il launcher), che rieseguiva il main → fork bomb (8+ processi figli). Fix: portato tutto in-process con `streamlit.web.bootstrap.run` in un thread daemon nello stesso processo del launcher.
+2. **`signal only works in main thread`** — `bootstrap.run` registra handler con `signal.signal(SIGTERM, …)`, che funziona solo nel main thread. Fix: monkey-patch `signal.signal = lambda *a, **kw: None` dentro la funzione che gira nel thread runner. Effetto collaterale: streamlit non gestisce shutdown via signal, ma il thread è daemon e termina con il processo principale (pywebview) → accettabile.
+3. **Streamlit binda 8501 ignorando la porta richiesta** — le env vars `STREAMLIT_SERVER_PORT` non bastano se chiamato via bootstrap. Fix: `bootstrap.load_config_options(flag_options={"server_port": porta, "server_address": "127.0.0.1", ...})` PRIMA di `bootstrap.run`. Attenzione: le chiavi sono in formato CLI (`server_port` con `_`, non `server.port` con `.`).
+4. **`PackageNotFoundError: streamlit`** — `streamlit/version.py` chiama `importlib.metadata.version("streamlit")` all'import. Senza `.dist-info` dentro il bundle il pacchetto crasha subito. Fix: nello spec `datas += copy_metadata("streamlit")` e per traslazione anche per `anthropic`, `httpx`, `openpyxl`, `pypdf`, `python-docx`, `python-dotenv` (alcuni leggono la propria versione nello stesso modo).
+5. **`ImportError: cannot import name 'seed' from 'cicerone.db'`** — `app.py` è trasportata come `data` (perché lanciata via `streamlit run` interno), quindi PyInstaller non analizza i suoi import (`cicerone.db.seed`, `.mcda`, `.llm`) e non li include. Fix: `hiddenimports += collect_submodules("cicerone")` nello spec per forzare l'inclusione di tutto il package.
+6. **`FileNotFoundError: Criteri_Readiness_Maturity.md`** — `seed.py` risolve `ROOT/Criteri_Readiness_Maturity.md` dove `ROOT = Path(__file__).parent.parent.parent`, che nel bundle PyInstaller diventa `Contents/Frameworks/`. Fix: aggiunto `(ROOT/"Criteri_Readiness_Maturity.md", ".")` ai `datas` dello spec così il file finisce nel root atteso.
+7. **`create-dmg` non installato** — il package Homebrew non era presente sulla macchina di build. Fix: fallback automatico in `build.sh` a `hdiutil create -volname Cicerone -srcfolder STAGING -ov -format UDZO`, con staging dir contenente `.app` + symlink `Applications`. Risultato funzionale ma layout meno curato (no sfondo, no posizioni icone).
+
+### Verifica finale
+
+- `dist/Cicerone.app` → 231 MB.
+- `dist/Cicerone.dmg` → 102 MB (formato UDZO).
+- Lancio diretto `Contents/MacOS/cicerone`: 1 solo processo (nessun fork), porta TCP bindata (verificata con `lsof -iTCP -sTCP:LISTEN`).
+- `curl http://127.0.0.1:PORTA/` → 200, `/_stcore/health` → `ok`.
+- DB scritto in `~/Library/Application Support/Cicerone/cicerone.sqlite` → 57 KB, seed completo (criteri caricati).
+- Zero traceback nei log durante avvio e prima richiesta.
+
+### Cosa resta aperto
+
+- **Knowledge base privata**: lo spec include `knowledge/frameworks/*.md` se presenti localmente al momento del build (gitignored). Sulla macchina di build attuale `knowledge/` NON è clonato → il `.dmg` prodotto NON contiene la KB, e diagnostica/report falliranno a runtime quando cercano i file. Prima della release vera: clonare repo privato `cicerone-knowledge` in `knowledge/` e rifare la build.
+- **NO code signing / notarization**: alla prima apertura compare il warning Gatekeeper. Documentato in `packaging/README.md` (Ctrl+click → Apri comunque). Per signing serve Apple Developer ID ($99/anno) — fuori scope di questo round.
+- **Single-arch**: bundle è `arm64` (build fatta su Apple Silicon). Per universal2 servirebbe `target_arch="universal2"` nello spec + Python universal2 + ricompilazione di tutte le deps native (pyobjc & co.).
+- **`create-dmg`**: layout `.dmg` attuale è minimal perché passato via `hdiutil`. Per layout curato: `brew install create-dmg`, rifare build → `build.sh` lo userà automaticamente (il ramo preferito è già scritto).
+- **Test UI end-to-end nel bundle**: smoke test passa (HTTP 200, health ok, DB scritto e popolato). Flusso completo onboarding → intervista → vincitore → diagnostica → report richiede API key Anthropic + knowledge base → da validare con app reale dopo clone KB.
+- **Release**: NON eseguita da Claude. L'utente farà la release ufficiale dopo aver pullato il branch.
+
+
