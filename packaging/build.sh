@@ -42,14 +42,35 @@ fi
 APP_SIZE_MB=$(du -sm dist/Cicerone.app | cut -f1)
 echo "==> Cicerone.app pronto (${APP_SIZE_MB} MB)"
 
-echo "==> Genero Cicerone.dmg"
+# Stage bundle FUORI da iCloud Drive (Desktop sync ri-applica xattr
+# com.apple.fileprovider.fpfs#P e FinderInfo, che invalidano la firma).
+# Lavoriamo in /tmp dove iCloud non tocca.
+STAGE_DIR="/tmp/cicerone_build_$$"
+echo "==> Stage bundle in $STAGE_DIR (fuori da iCloud)"
+rm -rf "$STAGE_DIR"
+mkdir -p "$STAGE_DIR"
+ditto --norsrc --noextattr --noacl dist/Cicerone.app "$STAGE_DIR/Cicerone.app"
+
+# Ad-hoc re-sign: PyInstaller firma il binario PRIMA di COLLECT, quindi i file
+# aggiunti dopo invalidano il seal. macOS interpreta seal rotto come "danneggiato"
+# (errore senza nemmeno prompt Gatekeeper). Rifirmiamo tutto deep ad-hoc.
+echo "==> Ri-firma ad-hoc deep del bundle"
+codesign --force --deep --sign - "$STAGE_DIR/Cicerone.app"
+codesign --verify --deep --strict "$STAGE_DIR/Cicerone.app" && echo "    firma valida"
+
+# Sostituisci app in dist/ con quella firmata e pulita
+rm -rf dist/Cicerone.app
+ditto --norsrc --noextattr --noacl "$STAGE_DIR/Cicerone.app" dist/Cicerone.app
+
+echo "==> Genero Cicerone.dmg (in $STAGE_DIR per evitare xattr iCloud)"
 DMG_PATH="dist/Cicerone.dmg"
+STAGE_DMG="$STAGE_DIR/Cicerone.dmg"
 rm -f "$DMG_PATH"
 
 if command -v create-dmg >/dev/null 2>&1; then
-    create-dmg \
+    ( cd "$STAGE_DIR" && create-dmg \
         --volname "Cicerone" \
-        --volicon "packaging/icon.icns" \
+        --volicon "$ROOT/packaging/icon.icns" \
         --window-pos 200 120 \
         --window-size 640 420 \
         --icon-size 128 \
@@ -58,23 +79,28 @@ if command -v create-dmg >/dev/null 2>&1; then
         --app-drop-link 470 200 \
         --hide-extension "Cicerone.app" \
         --no-internet-enable \
-        "$DMG_PATH" \
-        "dist/Cicerone.app"
+        "$STAGE_DMG" \
+        "Cicerone.app" )
 else
     echo "    (create-dmg non installato, uso hdiutil)"
-    STAGING="dist/dmg_staging"
+    STAGING="$STAGE_DIR/dmg_staging"
     rm -rf "$STAGING"
     mkdir -p "$STAGING"
-    cp -R "dist/Cicerone.app" "$STAGING/"
+    ditto --norsrc --noextattr --noacl "$STAGE_DIR/Cicerone.app" "$STAGING/Cicerone.app"
     ln -s /Applications "$STAGING/Applications"
     hdiutil create \
         -volname "Cicerone" \
         -srcfolder "$STAGING" \
         -ov \
         -format UDZO \
-        "$DMG_PATH"
+        "$STAGE_DMG"
     rm -rf "$STAGING"
 fi
+
+# Sposta DMG firmato in dist/, strip xattr finale (iCloud non lo tocca prima del move)
+mv "$STAGE_DMG" "$DMG_PATH"
+xattr -cr "$DMG_PATH" 2>/dev/null || true
+rm -rf "$STAGE_DIR"
 
 if [ ! -f "$DMG_PATH" ]; then
     echo "ERRORE: $DMG_PATH non generato" >&2

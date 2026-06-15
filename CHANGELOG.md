@@ -7,6 +7,18 @@ progetto aderisce al [Versionamento Semantico](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-06-15
+
+### Fixed
+
+- **DMG "danneggiato" su macOS**: la v0.1.2 mostrava errore "danneggiato,
+  spostare nel Cestino" senza nemmeno il prompt Gatekeeper. Cause:
+  (1) PyInstaller firma il binario prima del COLLECT, lasciando il seal
+  ad-hoc inconsistente; (2) iCloud Drive sul Desktop ri-applicava xattr
+  (`com.apple.fileprovider.fpfs#P`, `FinderInfo`) che invalidavano la firma.
+  Fix in `packaging/build.sh`: stage del bundle in `/tmp` (fuori da iCloud),
+  re-firma ad-hoc deep dopo COLLECT, DMG generato in `/tmp` e poi spostato.
+
 ## [0.1.2] - 2026-06-15
 
 ### Fixed

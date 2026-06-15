@@ -157,8 +157,8 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "Cicerone",
         "CFBundleDisplayName": "Cicerone",
-        "CFBundleShortVersionString": "0.1.2",
-        "CFBundleVersion": "0.1.2",
+        "CFBundleShortVersionString": "0.1.3",
+        "CFBundleVersion": "0.1.3",
         "LSUIElement": False,
         "NSHighResolutionCapable": True,
         "NSHumanReadableCopyright": "© 2026 Cicerone",
