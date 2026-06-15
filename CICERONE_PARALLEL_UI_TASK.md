@@ -1060,4 +1060,476 @@ File modificati:
 - **Test UI end-to-end nel bundle**: smoke test passa (HTTP 200, health ok, DB scritto e popolato). Flusso completo onboarding → intervista → vincitore → diagnostica → report richiede API key Anthropic + knowledge base → da validare con app reale dopo clone KB.
 - **Release**: NON eseguita da Claude. L'utente farà la release ufficiale dopo aver pullato il branch.
 
+---
+
+## ROUND 6 — REFACTORING TOTALE & CLEANUP (2026-06-15, target Opus 4.7 xhigh)
+
+> **Per il collaboratore:** `git pull` nel repo `cicerone`. Apri Claude Code
+> con modello Opus 4.7 xhigh. Incolla TUTTO questo round come primo
+> messaggio. Non ci sono limiti di contesto o budget per questa sessione:
+> serve un lavoro **completo e autonomo**, non frammentato. Leggi prima
+> tutto il piano R1→R7, poi esegui in ordine senza tornare a chiedere
+> conferma su micro-decisioni. Comunica solo macro-decisioni (es. "lo
+> split di app.py rompe la sessione Streamlit, conviene tenere monolite?")
+> e fine sessione.
+
+### Contesto round 6
+
+Cicerone è funzionante end-to-end: web app Streamlit + bundle desktop
+macOS con setup knowledge first-run. Ma in 9 round di lavoro si è
+accumulato debito:
+
+- file morti (mock fallback obsoleti, stub `main.py`)
+- dipendenze inutilizzate (`python-docx`, `pypdf` non importate da nulla)
+- `.DS_Store` committati
+- 3 doc top-level che si sovrappongono (`CICERONE_CONTEXT.md`,
+  `CICERONE_PLAN.md`, `CICERONE_PARALLEL_UI_TASK.md` = 110 KB di markdown)
+- `cicerone/ui/app.py` monolitico (721 righe) con try/except fragili
+- `cicerone/desktop.py` monolitico (441 righe) con HTML inline
+- nessun lint config, nessun test, nessun CI
+
+Obiettivo: codebase pulito, leggero, manutenibile. **Senza rompere
+nulla.** Tutto deve continuare a funzionare: dev (`uv run streamlit
+run`) e bundle (`bash packaging/build.sh`).
+
+### Esplorazione preliminare (OBBLIGATORIA)
+
+Prima di toccare codice, leggi e fai inventario:
+
+```bash
+# Struttura
+find . -maxdepth 4 -type f ! -path "./.venv/*" ! -path "*/__pycache__/*" \
+  ! -path "./.git/*" ! -path "./build/*" ! -path "./dist/*" \
+  ! -path "./knowledge/pdfs/*" | sort
+
+# Dimensioni
+wc -l cicerone/**/*.py *.md packaging/*.{py,spec,sh,md}
+
+# Dipendenze: chi importa cosa
+grep -rn "^import\|^from" cicerone/ | grep -v "__pycache__"
+
+# Diff dei doc top-level (overlap)
+diff <(grep "^#" CICERONE_CONTEXT.md) <(grep "^#" CICERONE_PLAN.md)
+```
+
+Mappa mentalmente i confini. Solo dopo, procedi.
+
+### Mappa stato (giugno 2026)
+
+#### Repo `cicerone` (pubblico)
+
+```
+cicerone/
+├── .streamlit/config.toml          # tema Streamlit
+├── .env.example                    # template env (ANTHROPIC_API_KEY)
+├── .gitignore
+├── LICENSE
+├── pyproject.toml                  # deps + script entry
+├── uv.lock
+├── README.md                       # entry-point doc
+├── CICERONE_CONTEXT.md             # obsoleto in parte (vedi R4)
+├── CICERONE_PLAN.md                # obsoleto in parte (vedi R4)
+├── CICERONE_PARALLEL_UI_TASK.md    # questo file
+├── Criteri_Readiness_Maturity.md   # consumato da seed (KEEP)
+├── MatriceDB.xlsx                  # consumato da seed (KEEP)
+├── cicerone/
+│   ├── __init__.py
+│   ├── main.py                     # STUB inutile (vedi R1)
+│   ├── desktop.py                  # 441 righe, da splittare (R3)
+│   ├── data/cicerone.sqlite        # dev DB, gitignored
+│   ├── db/
+│   │   ├── connection.py           # env var DB_PATH (KEEP)
+│   │   ├── repository.py           # 232 righe (KEEP)
+│   │   ├── schema.sql
+│   │   └── seed.py
+│   ├── llm/
+│   │   ├── _client.py              # Anthropic wrapper (KEEP)
+│   │   ├── intervista.py           # 156 righe (KEEP)
+│   │   ├── diagnostica.py          # 239 righe (KEEP, env var KNOWLEDGE_DIR)
+│   │   └── report.py               # 156 righe (KEEP)
+│   ├── mcda/
+│   │   └── calcolo.py              # 62 righe (KEEP)
+│   └── ui/
+│       ├── app.py                  # 721 righe, da splittare (R3)
+│       ├── _mock.py                # 196 righe, FALLBACK MORTO (vedi R2)
+│       └── style.css
+└── packaging/
+    ├── cicerone.spec               # PyInstaller (KEEP)
+    ├── build.sh                    # build .app + .dmg (KEEP)
+    ├── generate_icon.py            # script icona riproducibile (KEEP)
+    ├── icon.icns                   # icona generata (KEEP)
+    └── README.md                   # doc packaging (KEEP)
+```
+
+#### Repo `cicerone-knowledge` (privato, cloned in `knowledge/` gitignored)
+
+```
+cicerone-knowledge/
+├── README.md
+├── EXTRACTION_PROMPT.md            # system prompt per estrarre framework da PDF
+├── _TEMPLATE.md                    # template framework markdown
+├── frameworks/*.md                 # 11 framework (consumati da diagnostica/report)
+└── pdfs/*.pdf                      # 11 paper originali (riferimento, NON runtime)
+```
+
+Il refactoring di questo round tocca **solo** `cicerone`. `cicerone-knowledge`
+è già pulito.
+
+### Inventario refactor
+
+#### KEEP (zero modifiche)
+- `cicerone/db/schema.sql`, `seed.py`, `connection.py`, `repository.py`
+- `cicerone/llm/*` (logica già pulita)
+- `cicerone/mcda/calcolo.py`
+- `cicerone/ui/style.css`
+- `Criteri_Readiness_Maturity.md`, `MatriceDB.xlsx`
+- `packaging/cicerone.spec`, `build.sh`, `generate_icon.py`, `icon.icns`, `README.md`
+- `pyproject.toml` build-system block
+
+#### REMOVE (eliminazioni nette)
+- `cicerone/main.py` — stub `print("Hello from cicerone!")`, mai chiamato da nulla di reale
+- `cicerone/ui/_mock.py` — usato solo come fallback nei try/except in `app.py`. I moduli reali esistono e funzionano. Fallback morto.
+- `.DS_Store` (×3): `.`, `cicerone/`, `knowledge/`. Aggiungi a `.gitignore` se non c'è già.
+- `packaging/icon_preview.png` — già gitignored, ma se accidentalmente trackato rimuovi
+- Dipendenze runtime inutilizzate da `pyproject.toml`:
+  - `pypdf>=6.13.2` (mai importata in `cicerone/`)
+  - `python-docx>=1.2.0` (mai importata in `cicerone/`)
+  - `python-dotenv>=1.2.2` — usata SOLO in `_client.py` per dev convenience. Valutare: KEEP se vuoi continuare a leggere `.env` in dev. Default: **KEEP** (dev convenience).
+
+Verifica prima di rimuovere ognuna:
+```bash
+grep -rn "pypdf\|from pypdf" cicerone/ packaging/ scripts/ 2>/dev/null
+grep -rn "docx\|python-docx\|from docx" cicerone/ packaging/ 2>/dev/null
+```
+Se zero risultati → rimuovi senza esitare.
+
+Dopo rimozione deps: `uv lock` per aggiornare lockfile. Aggiorna anche
+`packaging/cicerone.spec`: rimuovi le righe `copy_metadata("pypdf")` e
+`copy_metadata("python-docx")` + l'hidden import corrispondente.
+
+#### FIX (refactor in place)
+- `cicerone/ui/app.py`:
+  - Rimuovi `from cicerone.ui import _mock` e tutti i fallback `getattr(repo, "salva_contesto", _mock.salva_contesto)`. I moduli reali ci sono.
+  - Rimuovi i try/except sugli import LLM (righe ~38-65). Ora gli import sono garantiti.
+  - Vedi R3 per split opzionale.
+- `cicerone/desktop.py`:
+  - HTML inline (setup window + splash) → estrai in `cicerone/desktop/_html.py` con costanti `SETUP_HTML` e `SPLASH_HTML`.
+  - Logica clone/copy → estrai in `cicerone/desktop/_knowledge_setup.py`.
+  - Launcher core (porta, streamlit, webview) resta in `cicerone/desktop/__init__.py` (o `cicerone/desktop/launcher.py` con `__init__.py` che fa `from .launcher import main`).
+- `pyproject.toml`:
+  - Rimuovi `[project.scripts] cicerone = "cicerone.main:main"` se `main.py` viene cancellato. Oppure punta a un launcher CLI realistico (es. `cicerone = "cicerone.desktop:main"`).
+
+### Phase R1 — Pulizia (30 min)
+
+**Goal:** zero file morti, zero deps morte, gitignore in regola.
+
+```bash
+# 1. Rimuovi .DS_Store committati
+find . -name ".DS_Store" -not -path "./.venv/*" -not -path "./.git/*" -delete
+grep -q "^.DS_Store$" .gitignore || echo ".DS_Store" >> .gitignore
+
+# 2. Verifica deps morte (output deve essere vuoto per pypdf/docx)
+grep -rn "import pypdf\|from pypdf" cicerone/ packaging/
+grep -rn "import docx\|from docx" cicerone/ packaging/
+
+# 3. Rimuovi deps morte
+# Modifica manuale pyproject.toml: togli pypdf, python-docx
+uv lock
+uv sync
+
+# 4. Cancella main.py stub
+git rm cicerone/main.py
+# Aggiorna pyproject.toml: rimuovi [project.scripts] o aggiorna entry
+
+# 5. Cancella _mock.py
+git rm cicerone/ui/_mock.py
+# Poi pulisci gli import in app.py (vedi R2)
+```
+
+**Verifica R1:**
+- `uv sync` non fallisce
+- `uv run streamlit run cicerone/ui/app.py` non rompe
+- `git status` mostra solo le rimozioni intenzionali
+
+### Phase R2 — Rimozione mock fallback (45 min)
+
+**Goal:** `cicerone/ui/app.py` senza più try/except sugli import.
+
+In `app.py`:
+
+```python
+# PRIMA (fragile)
+try:
+    from cicerone.mcda import calcolo as mcda
+except ImportError:
+    mcda = _mock
+
+# DOPO (pulito)
+from cicerone.mcda import calcolo as mcda
+```
+
+Lo stesso per `llm_intervista`, `llm_diag`, `llm_report`.
+
+Rimuovi anche:
+```python
+salva_contesto = getattr(repo, "salva_contesto", _mock.salva_contesto)
+storia_fn = getattr(repo, "storia_diagnostica", None) or getattr(_mock, "storia_diagnostica", lambda _: [])
+```
+→
+```python
+salva_contesto = repo.salva_contesto
+storia_fn = repo.storia_diagnostica
+```
+
+Verifica che le funzioni esistano davvero in `repository.py`. Se mancano, aggiungile prima di rimuovere i fallback.
+
+**Verifica R2:**
+```bash
+uv run python -c "from cicerone.ui import app; print(dir(app))" | grep -v "_mock"
+# Nessuna menzione di _mock attesa
+uv run streamlit run cicerone/ui/app.py
+# Flow end-to-end: onboarding → intervista → vincitore → diagnostica → report
+```
+
+### Phase R3 — Split moduli (1.5h)
+
+**Goal:** moduli sotto le 300 righe, responsabilità separate.
+
+#### R3.1 — `cicerone/ui/app.py` (721 → ~250 + pages)
+
+Streamlit gestisce single-file naturalmente. Lo split funziona se mantieni
+`app.py` come orchestratore che chiama funzioni delle pagine. Struttura:
+
+```
+cicerone/ui/
+├── app.py              # entry-point + state machine + sidebar (~250 righe)
+├── style.css
+└── pages/
+    ├── __init__.py
+    ├── onboarding.py   # pagina_onboarding (~140 righe)
+    ├── intervista.py   # pagina_intervista (~150 righe)
+    ├── vincitore.py    # pagina_vincitore (~100 righe)
+    ├── diagnostica.py  # pagina_diagnostica (~120 righe)
+    ├── report.py       # pagina_report (~80 righe)
+    └── _shared.py      # helper UI: spinner_cicerone, vai_a, header (~80 righe)
+```
+
+`app.py` esempio:
+```python
+from cicerone.ui.pages.onboarding import pagina_onboarding
+from cicerone.ui.pages.intervista import pagina_intervista
+...
+
+def main():
+    init_state(); inject_style(); sidebar_navigation()
+    step = st.session_state.step
+    {
+        "onboarding": pagina_onboarding,
+        "intervista": pagina_intervista,
+        ...
+    }[step]()
+```
+
+**Attenzione:** lo `st.session_state` è globale, non passare nulla
+esplicitamente; le pagine lo leggono direttamente. Gli helper condivisi
+(`spinner_cicerone` ecc.) vivono in `_shared.py`.
+
+**Test obbligatorio dopo split:** lancia `uv run streamlit run cicerone/ui/app.py`
+e completa un assessment intero. Streamlit caching e session_state
+possono rompersi se uno split è fatto male.
+
+#### R3.2 — `cicerone/desktop.py` (441 → ~150 + helpers)
+
+```
+cicerone/desktop/
+├── __init__.py             # re-export main
+├── launcher.py             # main(), avvia streamlit, orchestratore (~150 righe)
+├── setup_knowledge.py      # clone/copy logica + JS API (~120 righe)
+├── _html.py                # SETUP_HTML, SPLASH_HTML costanti (~100 righe)
+└── paths.py                # APP_SUPPORT, KNOWLEDGE_TARGET, _base_path (~40 righe)
+```
+
+`cicerone/desktop/__init__.py`:
+```python
+from cicerone.desktop.launcher import main
+__all__ = ["main"]
+```
+
+**Verifica:** `uv run python -m cicerone.desktop` apre finestra come prima.
+Poi `bash packaging/build.sh` deve continuare a buildare correttamente
+(verifica che `packaging/cicerone.spec` punti a `cicerone/desktop/__init__.py`
+o `cicerone/desktop/launcher.py` come entry).
+
+#### R3.3 — `cicerone/llm/diagnostica.py` (239 righe) — OPZIONALE
+
+Sotto le 300, accettabile così. Solo se la logica `_carica_framework_md`
++ `FRAMEWORK_MD` mapping cresce, valuta `cicerone/llm/_knowledge.py`
+estratto. Per ora SKIP.
+
+### Phase R4 — Consolidamento doc (1h)
+
+**Goal:** un solo doc autorevole sul progetto, niente sovrapposizioni.
+
+Stato attuale:
+- `README.md` (8 KB) — overview, setup, getting started
+- `CICERONE_CONTEXT.md` (25 KB) — contesto storico/dominio, parzialmente stale
+- `CICERONE_PLAN.md` (29 KB) — piano fasi, fasi ormai chiuse
+- `CICERONE_PARALLEL_UI_TASK.md` (58 KB) — task parallele round 1-6, diario
+- `packaging/README.md` (5 KB) — build .dmg, KEEP separato
+
+Azione:
+
+1. **Estrarre da `CICERONE_CONTEXT.md` solo ciò che è ancora vero**
+   (palette, regole architetturali, modello di dominio) → migrare in
+   sezioni nuove del `README.md` principale OPPURE in `ARCHITECTURE.md` nuovo.
+2. **Archiviare `CICERONE_PLAN.md` e `CICERONE_PARALLEL_UI_TASK.md`** in
+   `docs/archive/` (cartella nuova). Storico utile, non più operativo.
+   Aggiungi `docs/archive/README.md` che spiega cosa c'è dentro.
+3. **Aggiornare `README.md`** con:
+   - Cos'è Cicerone (1 paragrafo)
+   - Stack (Python 3.11+, uv, Streamlit, Anthropic SDK)
+   - Quickstart dev (`uv sync`, knowledge clone, `uv run streamlit run …`)
+   - Quickstart desktop (link a `packaging/README.md`)
+   - Struttura repo (alberato 1 livello)
+   - Domini/glossario sintetico (criterio, peso, voto, assessment, framework)
+   - Link a `ARCHITECTURE.md` se creato
+4. **Nuovo `CHANGELOG.md`** (Keep a Changelog format) con sezioni
+   `[0.1.0] - 2026-06-15 — prima release desktop` riassuntiva.
+
+**Non eliminare i doc senza archiviarli.** `git mv` in `docs/archive/`,
+non `git rm`.
+
+### Phase R5 — Lint baseline (30 min)
+
+**Goal:** ruff configurato, codebase passa.
+
+`pyproject.toml`:
+```toml
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501"]
+```
+
+Esegui:
+```bash
+uv add --group dev ruff
+uv run ruff check .
+uv run ruff format --check .
+```
+
+Sistema gli errori (probabilmente import non usati post-cleanup R1/R2,
+qualche f-string vuota, qualche `else` ridondante). NON applicare
+`ruff format` su file mai toccati senza review (rischio churn enorme):
+applica solo sui file effettivamente modificati in questo round.
+
+### Phase R6 — Smoke test baseline (45 min)
+
+**Goal:** test minimi che girano in <10s, per non riaprire bug già chiusi.
+
+```
+tests/
+├── __init__.py
+├── test_repository.py    # lista_criteri, lista_framework, salva_peso UPSERT
+├── test_mcda.py          # classifica_framework con assessment fittizio
+└── test_intervista_parse.py  # parse_risposta: ramo A vs B, is_retry
+```
+
+NO test di Streamlit UI (troppo flaky). NO test LLM end-to-end (costano).
+Solo unit puri su DB, MCDA e parsing.
+
+Setup:
+```bash
+uv add --group dev pytest
+mkdir -p tests
+```
+
+Per `test_intervista_parse.py` usa monkeypatch sul client Anthropic con
+risposte JSON canned.
+
+Esegui:
+```bash
+uv run pytest -v
+```
+
+### Phase R7 — Finalizzazione (30 min)
+
+**Goal:** branch pronto per merge + release v0.2.0.
+
+1. **Branch:** lavora su `refactor/round-6` (NON main, lezione dal round 5).
+2. **Commit granulari** per phase: `R1 cleanup`, `R2 rimozione mock`, ecc.
+3. **Verifica finale completa:**
+   ```bash
+   uv sync
+   uv run pytest -v
+   uv run ruff check .
+   uv run streamlit run cicerone/ui/app.py  # completa 1 assessment end-to-end
+   bash packaging/build.sh                  # rebuild .dmg
+   open dist/Cicerone.dmg                   # smoke test desktop
+   ```
+4. **PR description** (no merge automatico, lascia review utente):
+   - Diff stats per phase
+   - File rimossi
+   - Test aggiunti
+   - Verifica desktop bundle OK
+5. **Tag e release**: NON da te. Utente farà `git tag v0.2.0` dopo merge.
+
+### Vincoli round 6
+
+- ❌ NIENTE nuove feature. Solo refactor, cleanup, doc, test.
+- ❌ NIENTE modifiche a `schema.sql` o seed (DB stabile)
+- ❌ NIENTE modifiche alla logica LLM (prompt invariati)
+- ❌ NIENTE modifiche al flow UX (ordine pagine, sequenza intervista)
+- ✅ PUOI cambiare moduli/file/cartelle (split, rename) PURCHÉ funzionalità invariata
+- ✅ PUOI riscrivere doc (README, archivio)
+- ✅ DEVI mantenere compatibilità: `uv run streamlit run` + `bash packaging/build.sh` devono funzionare a fine round
+
+### Cosa comunicare a fine round
+
+1. **Diff stats globali**: righe rimosse, righe aggiunte, file cancellati
+2. **Lista deps rimosse**
+3. **Lista doc archiviati**
+4. **Risultati test (`pytest -v` summary)**
+5. **Risultati lint (`ruff check` count)**
+6. **Conferma smoke test desktop**: `.dmg` rebuild + apertura OK
+7. **Eventuali decisioni macro prese in autonomia**
+8. **Cosa rimane aperto**
+
+### Tempo stimato totale
+
+| Phase | Tempo | Cumulativo |
+|-------|-------|------------|
+| R1 Pulizia | 30 min | 0:30 |
+| R2 Mock fallback | 45 min | 1:15 |
+| R3 Split moduli | 1.5h | 2:45 |
+| R4 Doc | 1h | 3:45 |
+| R5 Lint | 30 min | 4:15 |
+| R6 Test | 45 min | 5:00 |
+| R7 Finalizzazione | 30 min | 5:30 |
+
+**5-6 ore di lavoro mirato.** Opus 4.7 xhigh può chiuderlo in una
+sessione singola se procede senza distrazioni.
+
+### Escape hatches
+
+- Se lo split di `app.py` introduce bug session_state difficili da
+  diagnosticare in <30 min → **rollback dello split, lascia monolite,
+  procedi con R4-R7.** Meglio refactor parziale che refactor rotto.
+- Se ruff produce >50 errori dopo il fix → applica solo `--fix` automatico
+  + format sui file modificati, NON push su tutto il codebase senza review.
+- Se pytest scopre regressioni → STOP, segnala all'utente prima di fixare.
+
+### Cosa NON è in questo round (rimandato a futuro)
+
+- Code signing/notarization (`.dmg` firmato Apple Developer ID)
+- CI/CD GitHub Actions
+- Cross-platform (Windows/Linux bundle)
+- Refresh knowledge via "aggiorna knowledge" in app (richiede keyring per PAT)
+- Refactor schema DB
+- Internazionalizzazione UI
+
+Documenta queste come "Future work" in `CHANGELOG.md` o `ROADMAP.md` nuovo.
 
