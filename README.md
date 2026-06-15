@@ -2,6 +2,14 @@
 
 > La voce che orienta la tua PMI nell'adozione dell'AI.
 
+> ⚠️ **Progetto in sviluppo attivo.** La release `v0.1.0` copre l'intero flusso
+> di **AI Readiness** (intervista, MCDA, diagnostica, report) sullo sheet
+> `readiness`. La parte dedicata all'**AI Implementation** — secondo sheet di
+> framework, percorso parallelo per aziende già pronte che vogliono passare
+> all'adozione effettiva — è pianificata per le release successive. Interfaccia
+> e logica MCDA sono già predisposte; mancano i contenuti della knowledge base
+> e i prompt LLM specifici.
+
 Cicerone è un agente AI conversazionale che aiuta le PMI italiane a valutare
 la propria AI Readiness/Maturity scegliendo, fra 11 framework accademici, quello
 più adatto al loro contesto. Il flusso guida l'utente attraverso un'intervista
@@ -104,6 +112,20 @@ Per i dettagli su moduli, flusso dati e design system vedi
 - **Diagnostica** — fase conversazionale multi-turno, successiva al calcolo
   MCDA, in cui l'LLM approfondisce i gap dell'azienda rispetto al framework
   vincitore prima di generare il report.
+
+## Origine del progetto
+
+Cicerone nasce da una **collaborazione spontanea fra studenti** della
+[SUPSI](https://www.supsi.ch/) (Scuola Universitaria Professionale della
+Svizzera Italiana) e dell'[Università degli Studi dell'Insubria](https://www.uninsubria.it/)
+(sede di Varese). Il gruppo si è ritrovato in modo autonomo, fuori dai canali
+istituzionali, con l'obiettivo di portare strumenti accademici di AI
+Readiness/Maturity — oggi rinchiusi in paper accademici poco accessibili — a
+portata di mano delle PMI italiane.
+
+Il progetto è guidato da questa collaborazione transfrontaliera e mantiene
+un'identità da prototipo accademico in evoluzione: nessuna pretesa di prodotto
+commerciale, ma una direzione precisa e una struttura ingegneristica solida.
 
 ## Licenza
 
