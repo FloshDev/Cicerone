@@ -7,21 +7,41 @@ progetto aderisce al [Versionamento Semantico](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
-### Changed
-
-- Refactoring Round 6: split dei moduli UI in `cicerone/ui/pages/` e del
-  launcher desktop in `cicerone/desktop/`, per separare meglio le
-  responsabilità.
-- Consolidamento della documentazione: README riscritto, nuovi `ARCHITECTURE.md`,
-  `CHANGELOG.md` e `ROADMAP.md` in root.
-
-### Removed
-
-- Cleanup di file e dipendenze non più usati.
+## [0.1.1] - 2026-06-15
 
 ### Added
 
-- Configurazione lint con `ruff` e smoke test con `pytest`.
+- **Notifica aggiornamenti in-app**: la sidebar mostra un banner ambrato
+  discreto con link diretto alla release quando una versione più recente è
+  pubblicata su GitHub. Check via GitHub Releases API, cache 1h, fallback
+  silenzioso offline o senza release pubblicate (modulo
+  `cicerone.version_check`).
+- `.dmg` con layout Finder curato: finestra 640×420, icona `Cicerone.app`
+  a sinistra e shortcut `Applications` a destra per drag&drop classico,
+  icona volume ambrata (`create-dmg` con `--volicon`).
+
+### Changed
+
+- Refactoring Round 6 (release tecnica): split dei moduli UI in
+  `cicerone/ui/pages/` e del launcher desktop in `cicerone/desktop/`.
+- Consolidamento della documentazione: README riscritto, nuovi
+  `ARCHITECTURE.md`, `CHANGELOG.md` e `ROADMAP.md` in root.
+
+### Removed
+
+- Cleanup di file e dipendenze non più usati (`pypdf`, `python-docx`,
+  `cicerone/main.py` stub, `cicerone/ui/_mock.py`).
+
+### Fixed
+
+- `packaging/cicerone.spec` referenziava `_mock.py` cancellato: rimozione
+  riferimento, build PyInstaller ora arriva fino a `.dmg` senza errori.
+- Lint cosmetici nei moduli LLM (`ruff` zero errori).
+
+### Tests
+
+- Configurazione `ruff` (E/F/I/B/UP/SIM, line-length 100).
+- Smoke test `pytest`: 27 test su repository, MCDA e parsing intervista.
 
 ### Docs
 

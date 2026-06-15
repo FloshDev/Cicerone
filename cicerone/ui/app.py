@@ -30,6 +30,7 @@ from cicerone.ui.pages.intervista import pagina_intervista
 from cicerone.ui.pages.onboarding import pagina_onboarding
 from cicerone.ui.pages.report import pagina_report
 from cicerone.ui.pages.vincitore import pagina_vincitore
+from cicerone.version_check import check_for_update
 
 # ---------- stato ----------
 
@@ -72,6 +73,34 @@ def reset_dati_utente() -> int:
 
 # ---------- sidebar ----------
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _check_aggiornamento_cached() -> dict:
+    """Wrapper cached: 1 chiamata GitHub API per ora, niente al primo rerun."""
+    return check_for_update()
+
+
+def banner_aggiornamento() -> None:
+    """Banner discreto se una release più recente è disponibile su GitHub.
+
+    Silenzioso se: offline, errore API, già aggiornato. Cache 1h così non
+    bombarda l'API ad ogni rerun di Streamlit.
+    """
+    info = _check_aggiornamento_cached()
+    if not info.get("has_update"):
+        return
+    latest = info.get("latest")
+    url = info.get("url") or "https://github.com/FloshDev/Cicerone/releases"
+    st.sidebar.markdown(
+        f'<div class="cic-update-banner">'
+        f'<div class="cic-update-title">Aggiornamento disponibile</div>'
+        f'<div class="cic-update-version">v{latest}</div>'
+        f'<a class="cic-update-link" href="{url}" target="_blank" rel="noopener">'
+        f'Scarica la nuova release</a>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def sidebar_stepper() -> None:
     step = st.session_state.step
 
@@ -80,6 +109,8 @@ def sidebar_stepper() -> None:
         '<div class="cic-sidebar-caption">Assessment AI Readiness</div>',
         unsafe_allow_html=True,
     )
+
+    banner_aggiornamento()
 
     # Badge stato chiave API
     stato = st.session_state.api_key_valida

@@ -259,3 +259,40 @@
     max-width: 32rem;
     line-height: 1.4;
 }
+
+.cic-update-banner {
+    margin: 0.4rem 0 0.8rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--cic-amber);
+    border-left-width: 3px;
+    border-radius: 4px;
+    background: rgba(232, 184, 75, 0.08);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.cic-update-title {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--cic-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.cic-update-version {
+    font-family: 'Cormorant Garamond', Garamond, serif;
+    font-size: 1.3rem;
+    color: var(--cic-amber);
+    line-height: 1.1;
+    margin: 0.15rem 0 0.35rem;
+}
+
+.cic-update-link {
+    font-size: 0.82rem;
+    color: var(--cic-text);
+    text-decoration: none;
+    border-bottom: 1px solid var(--cic-amber);
+    padding-bottom: 1px;
+}
+.cic-update-link:hover {
+    color: var(--cic-amber);
+}
