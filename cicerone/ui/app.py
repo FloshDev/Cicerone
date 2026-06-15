@@ -117,9 +117,11 @@ FASI = [
 CHIAVI_RESET = (
     "step", "contesto_azienda", "assessment_id", "criteri", "idx_criterio",
     "intervista_domanda_corrente", "intervista_idx_corrente",
-    "intervista_ultima_parsed", "intervista_clarif_done",
+    "intervista_ultima_parsed", "intervista_clarif_count", "intervista_chat",
     "diag_domanda_corrente", "report_markdown", "fasi_raggiunte",
 )
+
+MAX_CLARIFICATIONS_INTERVISTA = 2  # re-domande max per criterio (in aggiunta alla domanda iniziale)
 
 
 # ---------- helpers UI ----------
@@ -185,7 +187,8 @@ def init_state() -> None:
     st.session_state.setdefault("intervista_domanda_corrente", None)
     st.session_state.setdefault("intervista_idx_corrente", None)
     st.session_state.setdefault("intervista_ultima_parsed", None)
-    st.session_state.setdefault("intervista_clarif_done", set())
+    st.session_state.setdefault("intervista_clarif_count", {})
+    st.session_state.setdefault("intervista_chat", {})
     st.session_state.setdefault("diag_domanda_corrente", None)
     st.session_state.setdefault("report_markdown", None)
     st.session_state.setdefault("api_key", "")
@@ -198,6 +201,24 @@ def get_criteri() -> list[dict]:
     if st.session_state.criteri is None:
         st.session_state.criteri = repo.lista_criteri(SHEET)
     return st.session_state.criteri
+
+
+def reset_dati_utente() -> int:
+    """Cancella dati assessment dell'utente preservando seed (criteri/framework/voti).
+
+    Ritorna il numero di assessment cancellati prima del wipe.
+    """
+    with get_connection() as conn:
+        n = conn.execute("SELECT COUNT(*) FROM Assessment").fetchone()[0]
+        conn.executescript(
+            """
+            DELETE FROM Diagnostica;
+            DELETE FROM peso_assessment;
+            DELETE FROM Assessment;
+            """
+        )
+        conn.commit()
+    return int(n)
 
 
 def verifica_chiave(api_key: str) -> tuple[bool, str]:
@@ -264,6 +285,25 @@ def sidebar_stepper() -> None:
         for k in CHIAVI_RESET:
             st.session_state.pop(k, None)
         st.rerun()
+
+    with st.sidebar.expander("Manutenzione", expanded=False):
+        st.caption(
+            "Resetta tutti i dati di assessment per testare l'app su una nuova PMI. "
+            "Criteri e framework restano (sono dati di riferimento)."
+        )
+        conferma = st.checkbox("Confermo: cancella tutti gli assessment", key="cic_reset_conferma")
+        if st.button(
+            "Nuova PMI — pulizia dati",
+            key="sidebar_reset_db",
+            disabled=not conferma,
+            use_container_width=True,
+        ):
+            cancellati = reset_dati_utente()
+            for k in CHIAVI_RESET:
+                st.session_state.pop(k, None)
+            st.session_state.pop("cic_reset_conferma", None)
+            st.toast(f"DB ripulito ({cancellati} assessment cancellati).")
+            st.rerun()
 
 
 # ---------- pagine ----------
@@ -414,19 +454,32 @@ def pagina_intervista() -> None:
         st.error("Modulo intervista LLM non disponibile.")
         return
 
-    # Genera domanda quando entri nel criterio
+    chat_per_criterio: dict = st.session_state.intervista_chat
+    history: list = chat_per_criterio.setdefault(criterio_id, [])
+
+    # Genera domanda iniziale quando entri nel criterio per la prima volta
     if st.session_state.intervista_idx_corrente != i or st.session_state.intervista_domanda_corrente is None:
-        with spinner_cicerone("Sto formulando la domanda adatta al tuo contesto..."):
-            st.session_state.intervista_domanda_corrente = llm_intervista.domanda_per_criterio(
-                criterio, contesto
-            )
+        if not history:
+            with spinner_cicerone("Sto formulando la domanda adatta al tuo contesto..."):
+                domanda_iniziale = llm_intervista.domanda_per_criterio(criterio, contesto)
+            history.append({"role": "assistant", "content": domanda_iniziale, "kind": "domanda"})
+            st.session_state.intervista_domanda_corrente = domanda_iniziale
+        else:
+            # Ripristino: usa l'ultima domanda dell'assistente in history
+            domande = [m for m in history if m["role"] == "assistant"]
+            st.session_state.intervista_domanda_corrente = domande[-1]["content"] if domande else None
         st.session_state.intervista_idx_corrente = i
         st.session_state.intervista_ultima_parsed = None
 
-    with st.chat_message("assistant"):
-        st.markdown(st.session_state.intervista_domanda_corrente)
+    # Render chat history del criterio
+    for msg in history:
+        with st.chat_message(msg["role"]):
+            if msg.get("kind") == "approfondimento":
+                st.markdown(f"_Approfondimento_ — {msg['content']}")
+            else:
+                st.markdown(msg["content"])
 
-    # Mostra parsing precedente per trasparenza
+    # Mostra parsing inferito (trasparenza) — visibile solo per il criterio appena chiuso
     if st.session_state.intervista_ultima_parsed:
         p = st.session_state.intervista_ultima_parsed
         livello_label = f"**Livello inferito:** {p['livello']} (peso {p['peso']})"
@@ -450,31 +503,39 @@ def pagina_intervista() -> None:
     risposta = st.chat_input(placeholder)
 
     if risposta and risposta.strip():
-        with st.chat_message("user"):
-            st.markdown(risposta)
-        with spinner_cicerone("Sto interpretando la tua risposta..."):
-            parsed = llm_intervista.parse_risposta(criterio, contesto, risposta.strip())
+        risposta_clean = risposta.strip()
+        history.append({"role": "user", "content": risposta_clean})
 
-        # Gestione clarification: 1 sola richiesta di chiarimento per criterio
-        clarif_done = st.session_state.intervista_clarif_done
-        if parsed.get("needs_clarification") and criterio_id not in clarif_done:
-            clarif_done.add(criterio_id)
-            st.session_state.intervista_domanda_corrente = (
-                parsed.get("clarification_question")
-                or "Puoi spiegare meglio cosa intendi?"
+        clarif_count = st.session_state.intervista_clarif_count.get(criterio_id, 0)
+        # is_retry forza ramo B (parse anche se vago) all'ULTIMO tentativo permesso
+        is_retry = clarif_count >= MAX_CLARIFICATIONS_INTERVISTA
+
+        with spinner_cicerone("Sto interpretando la tua risposta..."):
+            parsed = llm_intervista.parse_risposta(
+                criterio, contesto, risposta_clean, is_retry=is_retry
             )
+
+        # Clarification ammessa finché count < MAX
+        if parsed.get("needs_clarification") and clarif_count < MAX_CLARIFICATIONS_INTERVISTA:
+            st.session_state.intervista_clarif_count[criterio_id] = clarif_count + 1
+            nuova_domanda = (
+                parsed.get("clarification_question")
+                or "Puoi spiegare meglio cosa intendi? Anche un esempio concreto va bene."
+            )
+            history.append({"role": "assistant", "content": nuova_domanda, "kind": "approfondimento"})
+            st.session_state.intervista_domanda_corrente = nuova_domanda
             st.session_state.intervista_ultima_parsed = None
             st.rerun()
 
-        # Salva e procedi (anche se 2° tentativo ambiguo)
+        # Salva e procedi (ramo B accettato, eventualmente con ambiguo=True)
         st.session_state.intervista_ultima_parsed = parsed
         repo.salva_peso(
             assessment_id=st.session_state.assessment_id,
             criterio_id=criterio_id,
             livello=parsed.get("livello", "Abbastanza importante"),
             peso=parsed.get("peso", 5.0),
-            motivazione=parsed.get("motivazione") or risposta.strip(),
-            trascrizione=risposta.strip(),
+            motivazione=parsed.get("motivazione") or risposta_clean,
+            trascrizione=risposta_clean,
             ambiguo=parsed.get("ambiguo", False),
         )
         st.session_state.idx_criterio = i + 1
