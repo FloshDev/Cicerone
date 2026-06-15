@@ -7,6 +7,18 @@ progetto aderisce al [Versionamento Semantico](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-06-15
+
+### Fixed
+
+- **Bundle PyInstaller incompleto**: `collect_submodules("cicerone")`
+  non rilevava i moduli `cicerone.db`, `cicerone.ui`, `cicerone.llm`,
+  `cicerone.mcda` in ambienti dove il pacchetto non era installato come
+  editable. Sintomo: `ImportError: cannot import name 'seed' from
+  'cicerone.db'` all'apertura dell'app.
+  Fix: enumerazione esplicita dei moduli dal filesystem in
+  `packaging/cicerone.spec` come fallback (belt-and-suspenders).
+
 ## [0.1.1] - 2026-06-15
 
 ### Added

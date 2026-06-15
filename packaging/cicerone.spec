@@ -61,6 +61,25 @@ hiddenimports = []
 # `streamlit run`), quindi i suoi import (cicerone.db.seed, .mcda, .llm…)
 # non vengono rilevati dall'analisi statica di PyInstaller. Forziamo.
 hiddenimports += collect_submodules("cicerone")
+
+# Belt-and-suspenders: in alcuni env (cicerone non installato come
+# pacchetto), collect_submodules può tornare incompleto. Enumeriamo
+# manualmente i moduli dal filesystem.
+def _walk_cicerone_modules():
+    out = []
+    pkg_root = ROOT / "cicerone"
+    for py in pkg_root.rglob("*.py"):
+        if "__pycache__" in py.parts:
+            continue
+        rel = py.relative_to(ROOT).with_suffix("")
+        parts = list(rel.parts)
+        if parts[-1] == "__init__":
+            parts.pop()
+        if parts:
+            out.append(".".join(parts))
+    return out
+
+hiddenimports += _walk_cicerone_modules()
 hiddenimports += collect_submodules("streamlit")
 hiddenimports += collect_submodules("anthropic")
 hiddenimports += collect_submodules("httpx")
@@ -138,8 +157,8 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "Cicerone",
         "CFBundleDisplayName": "Cicerone",
-        "CFBundleShortVersionString": "0.1.1",
-        "CFBundleVersion": "0.1.1",
+        "CFBundleShortVersionString": "0.1.2",
+        "CFBundleVersion": "0.1.2",
         "LSUIElement": False,
         "NSHighResolutionCapable": True,
         "NSHumanReadableCopyright": "© 2026 Cicerone",
