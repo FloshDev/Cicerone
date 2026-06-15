@@ -26,7 +26,6 @@ datas = [
     (str(ROOT / "cicerone" / "db" / "schema.sql"), "cicerone/db"),
     (str(ROOT / "cicerone" / "ui" / "style.css"), "cicerone/ui"),
     (str(ROOT / "cicerone" / "ui" / "app.py"), "cicerone/ui"),
-    (str(ROOT / "cicerone" / "ui" / "_mock.py"), "cicerone/ui"),
     (str(ROOT / "MatriceDB.xlsx"), "."),
     (str(ROOT / "Criteri_Readiness_Maturity.md"), "."),
     (str(ROOT / ".streamlit" / "config.toml"), ".streamlit"),
