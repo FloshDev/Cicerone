@@ -121,7 +121,7 @@ Svizzera Italiana) e dell'[Università degli Studi dell'Insubria](https://www.un
 (sede di Varese). Il gruppo si è ritrovato in modo autonomo, fuori dai canali
 istituzionali, con l'obiettivo di portare strumenti accademici di AI
 Readiness/Maturity — oggi rinchiusi in paper accademici poco accessibili — a
-portata di mano delle PMI italiane.
+portata di mano delle PMI europee.
 
 Il progetto è guidato da questa collaborazione transfrontaliera e mantiene
 un'identità da prototipo accademico in evoluzione: nessuna pretesa di prodotto
