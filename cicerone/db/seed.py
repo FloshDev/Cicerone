@@ -6,8 +6,9 @@ from openpyxl import load_workbook
 from cicerone.db.connection import get_connection
 
 ROOT = Path(__file__).parent.parent.parent
-MATRICE_XLSX = ROOT / "MatriceDB.xlsx"
-CRITERI_MD = ROOT / "Criteri_Readiness_Maturity.md"
+RESOURCES = ROOT / "resources"
+MATRICE_XLSX = RESOURCES / "MatriceDB.xlsx"
+CRITERI_MD = RESOURCES / "Criteri_Readiness_Maturity.md"
 
 SHEET_READINESS = "AI Readiness-Maturity"
 SHEET_NOMI = ["readiness", "implementation"]

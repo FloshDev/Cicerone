@@ -32,7 +32,7 @@ def _init_db_once() -> None:
         conn.executescript(SCHEMA_SQL.read_text(encoding="utf-8"))
         conn.commit()
 
-    # Seed reale: legge MatriceDB.xlsx + Criteri_Readiness_Maturity.md in root.
+    # Seed reale: legge MatriceDB.xlsx + Criteri_Readiness_Maturity.md da resources/.
     from cicerone.db import seed
 
     seed.run_if_needed()

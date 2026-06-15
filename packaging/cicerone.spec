@@ -26,8 +26,8 @@ datas = [
     (str(ROOT / "cicerone" / "db" / "schema.sql"), "cicerone/db"),
     (str(ROOT / "cicerone" / "ui" / "style.css"), "cicerone/ui"),
     (str(ROOT / "cicerone" / "ui" / "app.py"), "cicerone/ui"),
-    (str(ROOT / "MatriceDB.xlsx"), "."),
-    (str(ROOT / "Criteri_Readiness_Maturity.md"), "."),
+    (str(ROOT / "resources" / "MatriceDB.xlsx"), "resources"),
+    (str(ROOT / "resources" / "Criteri_Readiness_Maturity.md"), "resources"),
     (str(ROOT / ".streamlit" / "config.toml"), ".streamlit"),
 ]
 

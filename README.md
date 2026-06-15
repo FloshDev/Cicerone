@@ -82,10 +82,10 @@ cicerone/                  # package Python
 └── data/                  # database SQLite a runtime (gitignored)
 
 packaging/                 # build .app/.dmg (PyInstaller + pywebview)
-docs/archive/              # documentazione storica non operativa
+resources/                 # asset statici consumati dal seed
+├── Criteri_Readiness_Maturity.md  # definizioni dei criteri
+└── MatriceDB.xlsx                 # matrice criteri/framework/voti
 knowledge/                 # knowledge base privata (clonata a parte, gitignored)
-Criteri_Readiness_Maturity.md  # definizioni dei criteri (consumato dal seed)
-MatriceDB.xlsx             # matrice criteri/framework/voti (sorgente del seed)
 pyproject.toml             # configurazione progetto, dipendenze, ruff
 .env.example               # template per ANTHROPIC_API_KEY
 ```
