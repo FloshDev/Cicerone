@@ -717,3 +717,218 @@ Da segnalare al backend: spostare la migration fuori dal load del modulo (es. fu
 - `python -c "from cicerone.ui import app"` → OK, tutte le funzioni esistono (`vai_a`, `spinner_cicerone`, `FASI`, `verifica_chiave`).
 - `uv run streamlit run cicerone/ui/app.py` → HTTP 200 su `:8501`, nessun errore in log.
 
+---
+
+## ROUND 5 — Wrap desktop macOS + .dmg (2026-06-15)
+
+> **Per il collaboratore:** `git pull` nel repo `cicerone`, apri Claude Code
+> nella cartella, incolla TUTTO il contenuto di questa sezione (da
+> "Contesto round 5" fino a fine documento) come primo messaggio. Claude
+> parte da solo. Lavorerai SOLO su packaging desktop: la UI Streamlit è
+> già completa e non va modificata.
+
+### Contesto round 5
+
+Cicerone è oggi una web app Streamlit (`uv run streamlit run cicerone/ui/app.py`).
+Obiettivo prima release: **`Cicerone.dmg` distribuibile su macOS**. Doppio click
+sul `.dmg` → drag&drop in Applications → doppio click sull'icona → si apre
+finestra desktop con dentro l'app Streamlit. Per l'utente finale: zero
+terminale, zero `pip install`, zero `streamlit run`.
+
+**Architettura wrap:**
+
+```
+Cicerone.app  (bundle macOS)
+ └─ launcher Python (bootstrap):
+     1. avvia streamlit come subprocess su porta random localhost
+     2. attende che il server risponda
+     3. apre finestra pywebview puntando a http://localhost:PORT
+     4. alla chiusura finestra → killa subprocess streamlit
+```
+
+Streamlit gira dentro al bundle. L'utente vede SOLO la finestra desktop,
+non sa che dietro c'è un web server locale.
+
+### Vincoli round 5
+
+- ❌ NON toccare `cicerone/ui/` — UI è finita e validata, non riaprire
+- ❌ NON toccare `cicerone/llm/`, `cicerone/mcda/`, `cicerone/db/repository.py`,
+      `cicerone/db/schema.sql`, `cicerone/db/seed.py`
+- ✅ PUOI modificare `cicerone/db/connection.py` SOLO per leggere `DB_PATH`
+      da env var `CICERONE_DB_PATH` se presente (necessario per bundle:
+      vedi "Pitfall #3" sotto). Una riga di patch.
+- ✅ PUOI aggiungere file nuovi in:
+   - `cicerone/desktop.py` (launcher)
+   - `packaging/` (cartella nuova: spec PyInstaller, script build .dmg, icona)
+- ✅ PUOI aggiungere dipendenze `pywebview` e `pyinstaller` a `pyproject.toml`
+      come `[dependency-groups]` `packaging` (NON come runtime dep — non vogliamo
+      pywebview nel wheel pubblicato)
+- ✅ PUOI usare `create-dmg` via Homebrew (`brew install create-dmg`) per
+      generare il `.dmg`. Se non disponibile, fallback a `hdiutil` nativo macOS.
+- ❌ NO code signing, NO notarization in questo round (prima release dev-only;
+      l'utente accetterà il warning Gatekeeper "developer non identificato").
+
+### Stack tecnico raccomandato
+
+| Componente | Scelta | Perché |
+|------------|--------|--------|
+| Wrapper window | `pywebview` (WKWebView backend) | Più semplice di Tauri/Electron, Python puro, integrato bene con subprocess |
+| Bundler | `pyinstaller` (one-folder, NON onefile) | Più affidabile di `py2app` con Streamlit. Onefile rallenta startup di molto. |
+| .dmg | `create-dmg` (Homebrew) | Più semplice di hdiutil + AppleScript |
+| Python runtime | uv → venv → pyinstaller usa quel Python | Stesso ambiente del dev |
+
+### File da creare
+
+#### 1. `cicerone/desktop.py` — launcher
+Cosa fa:
+1. Determina porta libera (`socket.socket().bind(('localhost', 0))`).
+2. Imposta env var `CICERONE_DB_PATH` a `~/Library/Application Support/Cicerone/cicerone.sqlite` (creando dir se non esiste).
+3. Avvia subprocess: `streamlit run <path_app.py> --server.port=<PORT> --server.headless=true --browser.gatherUsageStats=false --server.address=127.0.0.1`.
+4. Polling HTTP su `http://127.0.0.1:PORT/_stcore/health` finché 200 (timeout 30s).
+5. `webview.create_window("Cicerone", f"http://127.0.0.1:{PORT}", width=1200, height=800)` + `webview.start()`.
+6. Su `webview.start()` ritorno (finestra chiusa) → `subprocess.terminate()` + wait.
+
+Punti dolenti da gestire:
+- Path di `app.py` dentro il bundle: usa `sys._MEIPASS` se `getattr(sys, 'frozen', False)`, altrimenti path normale dev.
+- Path di `streamlit` eseguibile dentro il bundle: NON chiamare `streamlit` come comando shell, usa `streamlit.web.bootstrap.run(...)` direttamente in-process oppure `python -m streamlit run`. Preferibile: `streamlit.web.bootstrap.run(app_path, "", [], {})` in un `threading.Thread` invece del subprocess. Più portabile nel bundle.
+- Se preferisci subprocess: trova `sys.executable`, lancia `[sys.executable, "-m", "streamlit", "run", ...]`.
+
+#### 2. `packaging/cicerone.spec` — PyInstaller spec
+Punti chiave (Claude, NON copiare ciecamente: leggi la doc PyInstaller corrente e adatta):
+- `datas` deve includere:
+   - `('cicerone/db/schema.sql', 'cicerone/db')`
+   - `('cicerone/ui/style.css', 'cicerone/ui')`
+   - `('cicerone/ui/app.py', 'cicerone/ui')` — sì, app.py va trasportata come data per `streamlit run`
+   - `('knowledge/frameworks', 'knowledge/frameworks')` — knowledge base (vedi Pitfall #4)
+   - `('MatriceDB.xlsx', '.')` — usato dal seed
+   - `('.streamlit/config.toml', '.streamlit')`
+- `hiddenimports` deve includere streamlit submoduli che PyInstaller non rileva: usa `collect_submodules('streamlit')` e `collect_submodules('anthropic')`.
+- `datas += collect_data_files('streamlit')` — Streamlit ha tanti asset statici (frontend bundle React, CSS).
+- Target macOS: `BUNDLE(name='Cicerone.app', icon='packaging/icon.icns', bundle_identifier='com.cicerone.desktop', info_plist={...})`.
+- `info_plist`: `LSUIElement = False` (app normale), `NSHighResolutionCapable = True`, `CFBundleShortVersionString = '0.1.0'`.
+
+#### 3. `packaging/build.sh` — script orchestrazione
+Sequenza:
+```bash
+#!/bin/bash
+set -euo pipefail
+rm -rf build dist
+uv run pyinstaller packaging/cicerone.spec --clean --noconfirm
+# verifica che dist/Cicerone.app esista
+test -d dist/Cicerone.app || { echo "Build app fallito"; exit 1; }
+# .dmg
+create-dmg \
+  --volname "Cicerone" \
+  --window-size 600 400 \
+  --icon "Cicerone.app" 150 200 \
+  --app-drop-link 450 200 \
+  --no-internet-enable \
+  dist/Cicerone.dmg dist/Cicerone.app
+```
+
+#### 4. `packaging/icon.icns` — icona Dock
+Genera da PNG 1024×1024. Se non hai grafica, chiedi all'utente: minimo serve un file segnaposto.
+Comando da PNG: `iconutil -c icns packaging/icon.iconset` dopo aver creato `iconset` con 9 risoluzioni standard (16, 32, 64, 128, 256, 512, 1024 + @2x). In alternativa script Python con `Pillow`. Se l'utente non fornisce PNG, segnala e genera placeholder grigio con scritta "C".
+
+### Pitfall noti — leggili PRIMA di iniziare
+
+#### Pitfall #1 — bundling Streamlit
+Streamlit è notoriamente difficile da bundlare. Problemi comuni:
+- `streamlit.web.cli` cerca file relativi al package install path → con `--collect-data streamlit` di solito risolto
+- Static frontend `streamlit/static/` deve essere presente nel bundle
+- Versioni Streamlit ≥ 1.30 hanno meno problemi
+Se incontri errori "ModuleNotFoundError" al primo run, aggiungi hiddenimport mancante e ricompila. NON arrenderti al primo errore: aspettati 2-3 cicli di build+test.
+
+#### Pitfall #2 — Anthropic SDK + certificati SSL
+`anthropic` usa `httpx` → ha bisogno di `certifi`. PyInstaller di solito lo cattura, ma verifica: `datas += collect_data_files('certifi')`. Senza, le chiamate Claude falliscono con `SSL: CERTIFICATE_VERIFY_FAILED` nel bundle.
+
+#### Pitfall #3 — DB path dentro .app
+`cicerone/db/connection.py` ha:
+```python
+DB_PATH = Path(__file__).parent.parent / "data" / "cicerone.sqlite"
+```
+Dentro un `.app`, questo path è SOLO LETTURA. SQLite crash a primo write.
+
+**Fix minimo (UNICA modifica permessa fuori da `desktop.py` / `packaging/`):**
+```python
+import os
+DB_PATH = Path(os.environ["CICERONE_DB_PATH"]) if os.environ.get("CICERONE_DB_PATH") else Path(__file__).parent.parent / "data" / "cicerone.sqlite"
+```
+Il launcher `desktop.py` imposta `CICERONE_DB_PATH` a
+`~/Library/Application Support/Cicerone/cicerone.sqlite` prima di avviare
+streamlit. Dev mode senza env var → comportamento attuale invariato.
+
+#### Pitfall #4 — Knowledge base (PRIVATO)
+`knowledge/frameworks/*.md` viene da repo privato `cicerone-knowledge`,
+gitignored qui. PyInstaller bundla quello che TROVA sul filesystem al
+momento del build. Quindi:
+1. Prima del build, `knowledge/frameworks/` deve esistere localmente (clone privato)
+2. Il `.dmg` risultante conterrà quel contenuto privato — OK per release interna
+3. Chiedi conferma all'utente PRIMA di pushare il `.dmg` da qualche parte: il
+   contenuto privato sta dentro. Per ora resta locale alla macchina dell'utente.
+
+#### Pitfall #5 — porta occupata
+Se l'utente apre due istanze, la seconda fallisce sulla porta. Soluzione: porta
+random ogni volta (`socket.bind(('', 0))` → leggi `.getsockname()[1]`).
+
+#### Pitfall #6 — primo startup lento
+Streamlit + Python interpreter dentro un bundle one-folder = 3-5 sec di delay.
+Il launcher deve mostrare ALMENO la finestra pywebview con un loader prima che
+streamlit risponda, altrimenti l'utente pensa che si sia bloccato. Mostra
+finestra subito + polling health in background + redirect quando ready. Oppure
+mostra splash HTML inline.
+
+#### Pitfall #7 — Gatekeeper "developer non identificato"
+.dmg non firmato → utente al primo apertura vede warning Apple:
+"Cicerone non può essere aperto perché lo sviluppatore non può essere
+verificato". Fix utente: Sistema → Privacy → "Apri comunque". Documenta
+in `packaging/README.md` come istruzione per l'utente.
+
+### Workflow consigliato (ordine sequenziale)
+
+1. **Esplora codice esistente** (`cicerone/ui/app.py`, `cicerone/db/connection.py`, `cicerone/llm/diagnostica.py` per i path knowledge).
+2. **Aggiungi env var override** a `connection.py` (5 righe).
+3. **Scrivi `cicerone/desktop.py`** — testalo IN DEV (non in bundle):
+   `uv run python -m cicerone.desktop` → deve aprire finestra pywebview con Streamlit dentro. Iterare finché funziona qui, NON passare al bundle prima.
+4. **Aggiungi deps**: `uv add --group packaging pywebview pyinstaller`.
+5. **Scrivi `packaging/cicerone.spec`** — primo build: `uv run pyinstaller packaging/cicerone.spec --clean`. Aspettati errori. Itera su `hiddenimports` e `datas` finché `dist/Cicerone.app` si lancia (doppio click in Finder).
+6. **Genera icona** (anche placeholder).
+7. **Scrivi `packaging/build.sh`** + verifica `create-dmg` installato.
+8. **Build `.dmg`**: `bash packaging/build.sh`. Apri il `.dmg`, drag in Applications, lancia, completa un assessment end-to-end.
+9. **Documenta in `packaging/README.md`**: come buildare, come gestire warning Gatekeeper, dove finiscono i dati utente (`~/Library/Application Support/Cicerone/`).
+10. **Commit + push** dopo conferma utente.
+
+### Tempo stimato
+
+2 ore di lavoro mirato. Distribuzione realistica:
+- 20 min: launcher `desktop.py` in dev
+- 10 min: patch `connection.py` + env var
+- 50 min: spec PyInstaller iterativo (qui sta il rischio)
+- 15 min: icona + build.sh + create-dmg
+- 15 min: test end-to-end `.dmg` su Mac pulito
+- 10 min: doc packaging
+
+**Se a 1h non hai ancora un `.app` che parte**: ferma, riporta all'utente cosa
+blocca. Streamlit + PyInstaller è territorio con trappole — meglio dire "spec
+non converge per X" che insistere alla cieca.
+
+### Deliverable
+
+- `dist/Cicerone.dmg` ~150-250 MB (Streamlit + Python + anthropic + knowledge)
+- Doppio click `.dmg` → finestra Finder con icona Cicerone + alias Applications
+- Drag in Applications → icona compare in Launchpad
+- Doppio click icona → finestra Cicerone si apre, flusso end-to-end funziona
+- Chiusura finestra → processi streamlit terminati (verifica con Activity Monitor)
+- `packaging/README.md` con istruzioni build + warning Gatekeeper per l'utente
+
+### Cosa comunicare a fine round
+
+- Path `.dmg` generato + dimensione
+- Quali pitfall hai colpito e come risolti (per documentare per future build)
+- Eventuali hiddenimport / collect_data_files aggiunti, così sono nello spec
+- Se hai dovuto cambiare qualcosa oltre `desktop.py` / `packaging/` / la riga
+  env var in `connection.py` → segnala esplicitamente perché viola i vincoli
+
+Buon lavoro. Niente vibe-build alla cieca: leggi gli errori di PyInstaller
+con attenzione, sono verbosi ma puntano al file mancante esatto.
+
