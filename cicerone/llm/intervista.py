@@ -144,7 +144,7 @@ Decidi ramo A o B e ritorna il JSON."""
     # Ramo B: parse normale (anche se LLM tentava chiarimento ma è retry)
     livello = parsed.get("livello") or "Abbastanza importante"
     if livello not in LIVELLO_PESO:
-        match = next((l for l in livelli if l.lower() == livello.lower()), None)
+        match = next((liv for liv in livelli if liv.lower() == livello.lower()), None)
         livello = match or "Abbastanza importante"
 
     return {
@@ -152,5 +152,5 @@ Decidi ramo A o B e ritorna il JSON."""
         "livello": livello,
         "peso": LIVELLO_PESO[livello],
         "motivazione": parsed.get("motivazione", "").strip(),
-        "ambiguo": bool(parsed.get("ambiguo", True if is_retry else False)),
+        "ambiguo": bool(parsed.get("ambiguo", bool(is_retry))),
     }

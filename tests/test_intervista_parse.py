@@ -1,0 +1,215 @@
+"""Unit test per cicerone.llm.intervista.parse_risposta / domanda_per_criterio.
+
+NESSUNA chiamata di rete: il client Anthropic è monkeypatchato. `intervista.py`
+chiama `get_client().messages.create(...)` e legge `resp.content[0].text`.
+Costruiamo un fake client che ritorna un testo "canned" prefissato, così da
+pilotare i due rami di parse_risposta (needs_clarification vs parse normale).
+"""
+import json
+
+import pytest
+
+from cicerone.llm import intervista
+
+
+# --- Fake client che imita la forma resp.content[0].text ---------------------
+class _FakeBlock:
+    def __init__(self, text: str):
+        self.text = text
+
+
+class _FakeResponse:
+    def __init__(self, text: str):
+        self.content = [_FakeBlock(text)]
+
+
+class _FakeMessages:
+    def __init__(self, canned_text: str):
+        self._canned_text = canned_text
+        self.calls: list[dict] = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return _FakeResponse(self._canned_text)
+
+
+class _FakeClient:
+    def __init__(self, canned_text: str):
+        self.messages = _FakeMessages(canned_text)
+
+
+@pytest.fixture
+def patch_client(monkeypatch):
+    """Ritorna un factory: data una stringa canned, monkeypatcha
+    intervista.get_client per restituire un fake client con quella risposta.
+    Espone il fake client (per ispezionare le call)."""
+    holder = {}
+
+    def _install(canned_text: str):
+        client = _FakeClient(canned_text)
+        monkeypatch.setattr(intervista, "get_client", lambda: client)
+        holder["client"] = client
+        return client
+
+    return _install
+
+
+CRITERIO = {
+    "idCriterio": 1,
+    "nomeCriterio": "Strategia AI",
+    "definizione": "Quanto l'azienda ha una visione chiara sull'uso dell'AI.",
+}
+CONTESTO = {"settore": "manifatturiero", "dimensione": "PMI 40 addetti"}
+
+
+# --- Ramo A: needs_clarification --------------------------------------------
+def test_parse_ramo_clarification(patch_client):
+    canned = json.dumps({
+        "needs_clarification": True,
+        "clarification_question": "In parole semplici: l'AI è una priorità per voi?",
+    })
+    patch_client(canned)
+
+    out = intervista.parse_risposta(CRITERIO, CONTESTO, "boh non ho capito")
+    assert out["needs_clarification"] is True
+    assert out["clarification_question"] == "In parole semplici: l'AI è una priorità per voi?"
+    # Nel ramo A non ci sono livello/peso.
+    assert "livello" not in out
+    assert "peso" not in out
+
+
+def test_parse_ramo_clarification_question_mancante_usa_default(patch_client):
+    canned = json.dumps({"needs_clarification": True})
+    patch_client(canned)
+    out = intervista.parse_risposta(CRITERIO, CONTESTO, "??")
+    assert out["needs_clarification"] is True
+    # Manca clarification_question -> fallback di default non vuoto.
+    assert isinstance(out["clarification_question"], str)
+    assert out["clarification_question"]
+
+
+# --- Ramo B: parse normale ---------------------------------------------------
+def test_parse_ramo_normale(patch_client):
+    canned = json.dumps({
+        "needs_clarification": False,
+        "livello": "Fondamentale",
+        "motivazione": "Per loro l'AI è centrale nel piano industriale.",
+        "ambiguo": False,
+    })
+    patch_client(canned)
+
+    out = intervista.parse_risposta(
+        CRITERIO, CONTESTO, "È assolutamente fondamentale per noi.")
+    assert out["needs_clarification"] is False
+    assert out["livello"] == "Fondamentale"
+    assert out["peso"] == 10.0  # mapping LIVELLO_PESO
+    assert out["motivazione"] == "Per loro l'AI è centrale nel piano industriale."
+    assert out["ambiguo"] is False
+
+
+def test_parse_livello_sconosciuto_fallback(patch_client):
+    """Livello non in mappa -> fallback 'Abbastanza importante'."""
+    canned = json.dumps({
+        "needs_clarification": False,
+        "livello": "Super Mega Critico",
+        "motivazione": "x",
+        "ambiguo": False,
+    })
+    patch_client(canned)
+    out = intervista.parse_risposta(CRITERIO, CONTESTO, "qualcosa")
+    assert out["livello"] == "Abbastanza importante"
+    assert out["peso"] == 5.0
+
+
+def test_parse_livello_case_insensitive(patch_client):
+    """Match case-insensitive di un livello valido."""
+    canned = json.dumps({
+        "needs_clarification": False,
+        "livello": "importante",  # minuscolo
+        "motivazione": "x",
+        "ambiguo": False,
+    })
+    patch_client(canned)
+    out = intervista.parse_risposta(CRITERIO, CONTESTO, "qualcosa")
+    assert out["livello"] == "Importante"
+    assert out["peso"] == 7.5
+
+
+def test_parse_json_in_code_fence(patch_client):
+    """parse_risposta deve gestire JSON dentro ```json ... ``` (markdown)."""
+    payload = {
+        "needs_clarification": False,
+        "livello": "Importante",
+        "motivazione": "ok",
+        "ambiguo": True,
+    }
+    canned = "```json\n" + json.dumps(payload) + "\n```"
+    patch_client(canned)
+    out = intervista.parse_risposta(CRITERIO, CONTESTO, "abbastanza importante")
+    assert out["needs_clarification"] is False
+    assert out["livello"] == "Importante"
+    assert out["ambiguo"] is True
+
+
+# --- Effetto di is_retry -----------------------------------------------------
+def test_is_retry_ignora_ramo_clarification(patch_client):
+    """Con is_retry=True, anche se l'LLM ritorna needs_clarification=True,
+    parse_risposta NON usa ramo A: forza il ramo B (best-effort)."""
+    canned = json.dumps({
+        "needs_clarification": True,
+        "clarification_question": "riprova...",
+    })
+    patch_client(canned)
+
+    out = intervista.parse_risposta(
+        CRITERIO, CONTESTO, "non saprei davvero", is_retry=True)
+    assert out["needs_clarification"] is False
+    # Nessun livello fornito + retry -> default 'Abbastanza importante'.
+    assert out["livello"] == "Abbastanza importante"
+    assert out["peso"] == 5.0
+    # ambiguo non specificato + is_retry=True -> default True.
+    assert out["ambiguo"] is True
+
+
+def test_retry_false_vs_true_stesso_input(patch_client):
+    """Stesso output LLM 'needs_clarification', comportamento diverso per is_retry."""
+    canned = json.dumps({
+        "needs_clarification": True,
+        "clarification_question": "spiegami meglio",
+    })
+
+    patch_client(canned)
+    out_no_retry = intervista.parse_risposta(CRITERIO, CONTESTO, "boh", is_retry=False)
+    assert out_no_retry["needs_clarification"] is True
+
+    patch_client(canned)
+    out_retry = intervista.parse_risposta(CRITERIO, CONTESTO, "boh", is_retry=True)
+    assert out_retry["needs_clarification"] is False
+
+
+def test_parse_no_rete_nessun_client_reale(patch_client):
+    """Sanity: la call passa per il fake client (registra la create)."""
+    canned = json.dumps({"needs_clarification": False, "livello": "Importante",
+                         "motivazione": "x", "ambiguo": False})
+    client = patch_client(canned)
+    intervista.parse_risposta(CRITERIO, CONTESTO, "test")
+    assert len(client.messages.calls) == 1
+    # Conferma che il modello richiesto è quello configurato in intervista.
+    assert client.messages.calls[0]["model"] == intervista.MODEL
+
+
+# --- domanda_per_criterio ----------------------------------------------------
+def test_domanda_per_criterio(patch_client):
+    patch_client("  Quanto è centrale l'AI nella vostra strategia produttiva?  ")
+    domanda = intervista.domanda_per_criterio(CRITERIO, CONTESTO)
+    # strip applicato.
+    assert domanda == "Quanto è centrale l'AI nella vostra strategia produttiva?"
+
+
+def test_domanda_per_criterio_contesto_none(patch_client):
+    client = patch_client("Una domanda generica?")
+    domanda = intervista.domanda_per_criterio(CRITERIO, None)
+    assert domanda == "Una domanda generica?"
+    # Contesto None -> stringa 'Nessun contesto fornito.' finisce nel prompt user.
+    user_msg = client.messages.calls[0]["messages"][0]["content"]
+    assert "Nessun contesto fornito." in user_msg

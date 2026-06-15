@@ -26,7 +26,6 @@ datas = [
     (str(ROOT / "cicerone" / "db" / "schema.sql"), "cicerone/db"),
     (str(ROOT / "cicerone" / "ui" / "style.css"), "cicerone/ui"),
     (str(ROOT / "cicerone" / "ui" / "app.py"), "cicerone/ui"),
-    (str(ROOT / "cicerone" / "ui" / "_mock.py"), "cicerone/ui"),
     (str(ROOT / "MatriceDB.xlsx"), "."),
     (str(ROOT / "Criteri_Readiness_Maturity.md"), "."),
     (str(ROOT / ".streamlit" / "config.toml"), ".streamlit"),
@@ -50,8 +49,6 @@ datas += copy_metadata("streamlit")
 datas += copy_metadata("anthropic")
 datas += copy_metadata("httpx")
 datas += copy_metadata("openpyxl")
-datas += copy_metadata("pypdf")
-datas += copy_metadata("python-docx")
 datas += copy_metadata("python-dotenv")
 
 
@@ -71,8 +68,6 @@ hiddenimports += collect_submodules("httpcore")
 hiddenimports += collect_submodules("h11")
 hiddenimports += [
     "openpyxl",
-    "pypdf",
-    "docx",
     "dotenv",
     "certifi",
 ]
@@ -82,7 +77,7 @@ block_cipher = None
 
 
 a = Analysis(
-    [str(ROOT / "cicerone" / "desktop.py")],
+    [str(ROOT / "cicerone" / "desktop" / "launcher.py")],
     pathex=[str(ROOT)],
     binaries=[],
     datas=datas,
