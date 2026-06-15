@@ -49,10 +49,14 @@ rm -f "$DMG_PATH"
 if command -v create-dmg >/dev/null 2>&1; then
     create-dmg \
         --volname "Cicerone" \
-        --window-size 600 400 \
+        --volicon "packaging/icon.icns" \
+        --window-pos 200 120 \
+        --window-size 640 420 \
         --icon-size 128 \
-        --icon "Cicerone.app" 150 200 \
-        --app-drop-link 450 200 \
+        --text-size 13 \
+        --icon "Cicerone.app" 170 200 \
+        --app-drop-link 470 200 \
+        --hide-extension "Cicerone.app" \
         --no-internet-enable \
         "$DMG_PATH" \
         "dist/Cicerone.app"
