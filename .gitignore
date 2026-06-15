@@ -41,3 +41,4 @@ build/
 dist/
 packaging/icon.iconset/
 *.spec.bak
+packaging/icon_preview.png

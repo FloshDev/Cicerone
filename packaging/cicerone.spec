@@ -32,11 +32,9 @@ datas = [
     (str(ROOT / ".streamlit" / "config.toml"), ".streamlit"),
 ]
 
-# Knowledge base: presente solo se il repo privato è clonato in knowledge/.
-# Senza, il bundle parte ma diagnostica/report falliscono quando cercano i PDF.
-knowledge_dir = ROOT / "knowledge" / "frameworks"
-if knowledge_dir.is_dir():
-    datas.append((str(knowledge_dir), "knowledge/frameworks"))
+# Knowledge base: NON bundlata. Il launcher mostra setup first-run che
+# clona il repo privato cicerone-knowledge o copia da cartella locale.
+# Override path runtime via CICERONE_KNOWLEDGE_DIR (settato da desktop.py).
 
 # Asset statici di Streamlit (frontend React, CSS, file di config).
 datas += collect_data_files("streamlit")

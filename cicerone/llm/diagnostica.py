@@ -12,6 +12,7 @@ API per UI:
     - Call successive: passa Q&A precedente → salva in DB + genera Qn
     - Quando l'LLM ritorna 'STOP' (≥3 risposte raccolte) → ritorna None
 """
+import os
 from pathlib import Path
 
 from cicerone.db import repository as repo
@@ -23,7 +24,11 @@ MIN_DOMANDE = 3
 MAX_RIASK = 3  # cap totale re-domande nella sessione, in ADDITION a MAX_DOMANDE
 RIASK_TAG = "[RIASK]"
 
-KNOWLEDGE_DIR = Path(__file__).parent.parent.parent / "knowledge" / "frameworks"
+KNOWLEDGE_DIR = (
+    Path(os.environ["CICERONE_KNOWLEDGE_DIR"])
+    if os.environ.get("CICERONE_KNOWLEDGE_DIR")
+    else Path(__file__).parent.parent.parent / "knowledge" / "frameworks"
+)
 
 # Mapping framework_id (DB) → file .md (best-effort, naming non perfettamente
 # allineato; #11 fallback su firm_level.md)
