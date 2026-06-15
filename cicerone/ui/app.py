@@ -33,38 +33,13 @@ def _bootstrap_schema_eager() -> None:
 _bootstrap_schema_eager()
 
 from cicerone.db import repository as repo  # noqa: E402  (import dopo bootstrap)
-from cicerone.ui import _mock  # noqa: E402
+from cicerone.llm import diagnostica as llm_diag  # noqa: E402
+from cicerone.llm import intervista as llm_intervista  # noqa: E402
+from cicerone.llm import report as llm_report  # noqa: E402
+from cicerone.llm._client import get_client, set_api_key  # noqa: E402
+from cicerone.mcda import calcolo as mcda  # noqa: E402
 
-try:
-    from cicerone.llm._client import set_api_key, get_client
-except ImportError:
-    def set_api_key(_k):  # type: ignore
-        return None
-
-    def get_client():  # type: ignore
-        raise RuntimeError("Client Anthropic non disponibile")
-
-try:
-    from cicerone.mcda import calcolo as mcda
-except ImportError:
-    mcda = _mock
-
-try:
-    from cicerone.llm import diagnostica as llm_diag
-except ImportError:
-    llm_diag = _mock
-
-try:
-    from cicerone.llm import report as llm_report
-except ImportError:
-    llm_report = _mock
-
-try:
-    from cicerone.llm import intervista as llm_intervista
-except ImportError:
-    llm_intervista = None
-
-salva_contesto = getattr(repo, "salva_contesto", _mock.salva_contesto)
+salva_contesto = repo.salva_contesto
 
 STYLE_CSS = Path(__file__).parent / "style.css"
 
@@ -622,8 +597,7 @@ def pagina_diagnostica() -> None:
     st.subheader("Diagnostica guidata")
     st.caption("Rispondi alle domande per personalizzare il report finale.")
 
-    storia_fn = getattr(repo, "storia_diagnostica", None) or getattr(_mock, "storia_diagnostica", lambda _: [])
-    storia = storia_fn(assessment_id)
+    storia = repo.storia_diagnostica(assessment_id)
     for qa in storia:
         with st.chat_message("assistant"):
             etichetta = "**Approfondimento** — " if qa.get("is_riask") else ""
