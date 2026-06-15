@@ -757,6 +757,9 @@ non sa che dietro c'è un web server locale.
 - ✅ PUOI modificare `cicerone/db/connection.py` SOLO per leggere `DB_PATH`
       da env var `CICERONE_DB_PATH` se presente (necessario per bundle:
       vedi "Pitfall #3" sotto). Una riga di patch.
+- ✅ PUOI modificare `cicerone/llm/diagnostica.py` e `cicerone/llm/report.py`
+      SOLO per leggere `KNOWLEDGE_DIR` da env var `CICERONE_KNOWLEDGE_DIR`
+      se presente (vedi "Knowledge base distribuzione" sotto). Due righe per file.
 - ✅ PUOI aggiungere file nuovi in:
    - `cicerone/desktop.py` (launcher)
    - `packaging/` (cartella nuova: spec PyInstaller, script build .dmg, icona)
@@ -799,7 +802,7 @@ Punti chiave (Claude, NON copiare ciecamente: leggi la doc PyInstaller corrente 
    - `('cicerone/db/schema.sql', 'cicerone/db')`
    - `('cicerone/ui/style.css', 'cicerone/ui')`
    - `('cicerone/ui/app.py', 'cicerone/ui')` — sì, app.py va trasportata come data per `streamlit run`
-   - `('knowledge/frameworks', 'knowledge/frameworks')` — knowledge base (vedi Pitfall #4)
+   - **NON bundlare `knowledge/frameworks/`** — contenuto privato, va distribuito separatamente (vedi sezione "Knowledge base distribuzione" sotto)
    - `('MatriceDB.xlsx', '.')` — usato dal seed
    - `('.streamlit/config.toml', '.streamlit')`
 - `hiddenimports` deve includere streamlit submoduli che PyInstaller non rileva: usa `collect_submodules('streamlit')` e `collect_submodules('anthropic')`.
@@ -858,14 +861,10 @@ Il launcher `desktop.py` imposta `CICERONE_DB_PATH` a
 `~/Library/Application Support/Cicerone/cicerone.sqlite` prima di avviare
 streamlit. Dev mode senza env var → comportamento attuale invariato.
 
-#### Pitfall #4 — Knowledge base (PRIVATO)
-`knowledge/frameworks/*.md` viene da repo privato `cicerone-knowledge`,
-gitignored qui. PyInstaller bundla quello che TROVA sul filesystem al
-momento del build. Quindi:
-1. Prima del build, `knowledge/frameworks/` deve esistere localmente (clone privato)
-2. Il `.dmg` risultante conterrà quel contenuto privato — OK per release interna
-3. Chiedi conferma all'utente PRIMA di pushare il `.dmg` da qualche parte: il
-   contenuto privato sta dentro. Per ora resta locale alla macchina dell'utente.
+#### Pitfall #4 — Knowledge base FUORI dal bundle
+**Decisione architetturale:** la knowledge base resta nel repo privato
+`cicerone-knowledge` e NON viene bundlata nel `.dmg`. Distribuzione separata
+gestita dal launcher al primo avvio. Vedi sezione dedicata sotto.
 
 #### Pitfall #5 — porta occupata
 Se l'utente apre due istanze, la seconda fallisce sulla porta. Soluzione: porta
@@ -884,28 +883,103 @@ mostra splash HTML inline.
 verificato". Fix utente: Sistema → Privacy → "Apri comunque". Documenta
 in `packaging/README.md` come istruzione per l'utente.
 
+### Knowledge base — distribuzione separata
+
+Knowledge base = repo privato `cicerone-knowledge` (proprietà utente).
+NON va dentro al `.dmg` per due ragioni: (1) contenuto privato non
+distribuibile; (2) si aggiorna indipendentemente dall'app.
+
+**Target persistenza:**
+```
+~/Library/Application Support/Cicerone/
+  ├── cicerone.sqlite              ← DB utente
+  └── knowledge/
+      └── frameworks/
+          ├── tortoise.md
+          ├── microsoft.md
+          └── ... (11 file .md)
+```
+
+**Override env var** (analogo a `CICERONE_DB_PATH`):
+
+In `cicerone/llm/diagnostica.py` e `cicerone/llm/report.py`, sostituisci:
+```python
+KNOWLEDGE_DIR = Path(__file__).parent.parent.parent / "knowledge" / "frameworks"
+```
+con:
+```python
+import os
+KNOWLEDGE_DIR = Path(os.environ["CICERONE_KNOWLEDGE_DIR"]) if os.environ.get("CICERONE_KNOWLEDGE_DIR") else Path(__file__).parent.parent.parent / "knowledge" / "frameworks"
+```
+Dev mode senza env var → comportamento invariato (punta a `knowledge/frameworks/` del repo).
+
+**First-run setup nel launcher `desktop.py`:**
+
+All'avvio, prima di lanciare Streamlit, il launcher verifica:
+```python
+knowledge_dir = Path.home() / "Library/Application Support/Cicerone/knowledge/frameworks"
+if not knowledge_dir.exists() or not any(knowledge_dir.glob("*.md")):
+    # mostra finestra setup
+    run_setup_window(knowledge_dir.parent)
+os.environ["CICERONE_KNOWLEDGE_DIR"] = str(knowledge_dir)
+```
+
+**Finestra setup** = piccola finestra `pywebview` con HTML inline (no Streamlit).
+Due opzioni in tab:
+
+**Opzione A — Clone repo privato GitHub** (preferita):
+- Form: input "GitHub Personal Access Token" + input "Repo URL" (default precompilato `https://github.com/FloshDev/cicerone-knowledge.git`)
+- Bottone "Scarica knowledge"
+- Esegue: `git clone https://<TOKEN>@<URL_SENZA_HTTPS>` dentro `~/Library/Application Support/Cicerone/knowledge_repo/`
+- Poi crea symlink o copia `knowledge_repo/frameworks/` → `knowledge/frameworks/`
+- Salva token (criptato con `keyring` macOS, NON in plaintext) per refresh futuri
+
+**Opzione B — Cartella locale**:
+- Bottone "Scegli cartella" → folder picker nativo (webview.create_file_dialog)
+- Utente seleziona cartella esistente con i `.md`
+- Launcher copia (o symlinka) i contenuti in `~/Library/Application Support/Cicerone/knowledge/frameworks/`
+
+Dopo setup completato → chiudi finestra setup → procedi col bootstrap Streamlit
+normale.
+
+**Refresh knowledge** (futuro, NON in questo round):
+- Bottone in app "Aggiorna knowledge" → `git pull` se opzione A usata
+- Per ora: utente cancella cartella e riavvia → re-trigger setup
+
+**Dipendenze aggiuntive:**
+- `gitpython` (per clone): `uv add --group packaging gitpython`
+- OPPURE chiama `git` di sistema via subprocess (più leggero, macOS ha git via Xcode CLT)
+- `keyring` per salvare token: `uv add --group packaging keyring`
+  - Se complica troppo il bundle, fallback: salva in file `~/Library/Application Support/Cicerone/.token` con `chmod 600`
+
+**Sicurezza token:**
+- MAI scrivere il token in chiaro in log/stdout
+- MAI committarlo. Path `~/Library/Application Support/Cicerone/` è fuori dal repo per definizione
+- Documenta in `packaging/README.md`: utente deve generare PAT con scope `repo:read` solo sul repo `cicerone-knowledge`
+
 ### Workflow consigliato (ordine sequenziale)
 
-1. **Esplora codice esistente** (`cicerone/ui/app.py`, `cicerone/db/connection.py`, `cicerone/llm/diagnostica.py` per i path knowledge).
-2. **Aggiungi env var override** a `connection.py` (5 righe).
-3. **Scrivi `cicerone/desktop.py`** — testalo IN DEV (non in bundle):
-   `uv run python -m cicerone.desktop` → deve aprire finestra pywebview con Streamlit dentro. Iterare finché funziona qui, NON passare al bundle prima.
-4. **Aggiungi deps**: `uv add --group packaging pywebview pyinstaller`.
-5. **Scrivi `packaging/cicerone.spec`** — primo build: `uv run pyinstaller packaging/cicerone.spec --clean`. Aspettati errori. Itera su `hiddenimports` e `datas` finché `dist/Cicerone.app` si lancia (doppio click in Finder).
-6. **Genera icona** (anche placeholder).
-7. **Scrivi `packaging/build.sh`** + verifica `create-dmg` installato.
-8. **Build `.dmg`**: `bash packaging/build.sh`. Apri il `.dmg`, drag in Applications, lancia, completa un assessment end-to-end.
-9. **Documenta in `packaging/README.md`**: come buildare, come gestire warning Gatekeeper, dove finiscono i dati utente (`~/Library/Application Support/Cicerone/`).
-10. **Commit + push** dopo conferma utente.
+1. **Esplora codice esistente** (`cicerone/ui/app.py`, `cicerone/db/connection.py`, `cicerone/llm/diagnostica.py`, `cicerone/llm/report.py` per path knowledge).
+2. **Aggiungi env var override** a `connection.py` + `llm/diagnostica.py` + `llm/report.py`.
+3. **Scrivi `cicerone/desktop.py`** SENZA setup window — solo launch streamlit. Testa: `uv run python -m cicerone.desktop` → finestra pywebview con Streamlit dentro. Itera finché OK in dev, NON bundlare ancora.
+4. **Aggiungi setup window** in `desktop.py` (HTML inline pywebview, tab A/B). Testa in dev: cancella `~/Library/Application Support/Cicerone/knowledge/` → riavvia → deve apparire setup. Completa clone con tuo PAT → setup chiude → Streamlit parte. Itera finché flow regge.
+5. **Aggiungi deps**: `uv add --group packaging pywebview pyinstaller` (e `gitpython`/`keyring` se decidi di usarle).
+6. **Scrivi `packaging/cicerone.spec`** — primo build: `uv run pyinstaller packaging/cicerone.spec --clean`. Aspettati errori. Itera su `hiddenimports` e `datas` finché `dist/Cicerone.app` si lancia.
+7. **Genera icona** (anche placeholder).
+8. **Scrivi `packaging/build.sh`** + verifica `create-dmg` installato.
+9. **Build `.dmg`**: `bash packaging/build.sh`. Apri il `.dmg`, drag in Applications, lancia. Prima esecuzione deve mostrare setup knowledge → chiave API (UI già esistente) → onboarding. Completa flow end-to-end.
+10. **Documenta in `packaging/README.md`**: come buildare, warning Gatekeeper, dove finiscono dati utente, come generare PAT GitHub per knowledge.
+11. **Commit + push** dopo conferma utente.
 
 ### Tempo stimato
 
-2 ore di lavoro mirato. Distribuzione realistica:
-- 20 min: launcher `desktop.py` in dev
-- 10 min: patch `connection.py` + env var
-- 50 min: spec PyInstaller iterativo (qui sta il rischio)
-- 15 min: icona + build.sh + create-dmg
-- 15 min: test end-to-end `.dmg` su Mac pulito
+2.5h di lavoro mirato (stima rivista per setup knowledge). Distribuzione realistica:
+- 15 min: patch env var su `connection.py` + 2 file `llm/`
+- 20 min: launcher `desktop.py` base (no setup window)
+- 30 min: setup window pywebview (HTML inline, clone repo privato + folder picker)
+- 45 min: spec PyInstaller iterativo (qui sta il rischio principale)
+- 10 min: icona + build.sh + create-dmg
+- 15 min: test end-to-end `.dmg` su cartella `~/Library/Application Support/Cicerone/` pulita
 - 10 min: doc packaging
 
 **Se a 1h non hai ancora un `.app` che parte**: ferma, riporta all'utente cosa
