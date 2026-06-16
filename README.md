@@ -10,7 +10,7 @@
 > e logica MCDA sono già predisposte; mancano i contenuti della knowledge base
 > e i prompt LLM specifici.
 
-Cicerone è un agente AI conversazionale che aiuta le PMI italiane a valutare
+Cicerone è un agente AI conversazionale che aiuta le PMI europee a valutare
 la propria AI Readiness/Maturity scegliendo, fra 11 framework accademici, quello
 più adatto al loro contesto. Il flusso guida l'utente attraverso un'intervista
 condotta da un LLM, un calcolo MCDA che determina il framework vincitore, una
