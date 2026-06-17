@@ -1,6 +1,21 @@
 /* Cicerone — identità visiva minimal
    Accento ambrato unico, font serif per header, divisori sottili. */
 
+/* Nasconde elementi default Streamlit (Deploy, hamburger, badge "Made with") */
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+[data-testid="stStatusWidget"],
+.stAppDeployButton,
+#MainMenu,
+header[data-testid="stHeader"] {
+    display: none !important;
+}
+
+/* Riduce padding default sopra contenuto principale ora che header sparisce */
+.stMainBlockContainer, [data-testid="stMainBlockContainer"] {
+    padding-top: 1.5rem !important;
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 
 :root {
@@ -40,7 +55,13 @@
     font-size: 1.9rem;
     line-height: 1;
     letter-spacing: 0.02em;
-    margin: 0 0 0.1rem 0;
+    margin: 0.4rem 0 0.1rem 0;
+    text-align: center;
+}
+
+/* Logo sidebar: padding ridotto, immagine compatta */
+[data-testid="stSidebar"] [data-testid="stImage"] {
+    margin: 0.2rem 0 0.6rem 0;
 }
 
 .cic-sidebar-caption {
@@ -49,6 +70,7 @@
     color: var(--cic-text-muted);
     font-size: 0.95rem;
     margin: 0 0 1rem 0;
+    text-align: center;
 }
 
 /* Divisore in stile classico: ─── · ─── */

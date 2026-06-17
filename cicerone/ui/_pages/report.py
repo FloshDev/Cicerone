@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from cicerone.ui.pages._shared import (
+from cicerone.ui._pages._shared import (
     CHIAVI_RESET,
     divider_cicerone,
     header_cicerone,

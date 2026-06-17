@@ -46,6 +46,7 @@ from cicerone.mcda import calcolo as mcda  # noqa: E402
 salva_contesto = repo.salva_contesto
 
 STYLE_CSS = Path(__file__).parent.parent / "style.css"
+LOGO_PATH = Path(__file__).parent.parent.parent.parent / "resources" / "branding" / "logo.png"
 
 SHEET = "readiness"
 
@@ -137,7 +138,7 @@ def get_criteri() -> list[dict]:
 
 
 # Superficie pubblica del modulo: import "pesanti" e helper sono re-esportati e
-# consumati dalle pagine via `from cicerone.ui.pages._shared import ...`.
+# consumati dalle pagine via `from cicerone.ui._pages._shared import ...`.
 __all__ = [
     # moduli/oggetti pesanti (re-export)
     "repo", "mcda", "llm_diag", "llm_intervista", "llm_report",

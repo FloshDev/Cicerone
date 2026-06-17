@@ -11,25 +11,26 @@ from cicerone.db import seed
 from cicerone.db.connection import get_connection
 
 # IMPORTANTE — ordine bootstrap schema (FRAGILE):
-# `cicerone.ui.pages._shared` esegue `_bootstrap_schema_eager()` in cima al
+# `cicerone.ui._pages._shared` esegue `_bootstrap_schema_eager()` in cima al
 # modulo, PRIMA di importare `repository` (che al load esegue una migration
 # ALTER TABLE che esplode su DB fresco). Importando `_shared` per primo qui
 # garantiamo che il bootstrap giri una sola volta prima di qualsiasi import di
 # repository fatto dalle pagine.
-from cicerone.ui.pages import _shared  # noqa: F401  (import per side-effect bootstrap)
-from cicerone.ui.pages._shared import (
+from cicerone.ui._pages import _shared  # noqa: F401  (import per side-effect bootstrap)
+from cicerone.ui._pages._shared import (
     CHIAVI_RESET,
     FASI,
+    LOGO_PATH,
     ROMANI,
     get_criteri,
     inject_style,
     set_api_key,
 )
-from cicerone.ui.pages.diagnostica import pagina_diagnostica
-from cicerone.ui.pages.intervista import pagina_intervista
-from cicerone.ui.pages.onboarding import pagina_onboarding
-from cicerone.ui.pages.report import pagina_report
-from cicerone.ui.pages.vincitore import pagina_vincitore
+from cicerone.ui._pages.diagnostica import pagina_diagnostica
+from cicerone.ui._pages.intervista import pagina_intervista
+from cicerone.ui._pages.onboarding import pagina_onboarding
+from cicerone.ui._pages.report import pagina_report
+from cicerone.ui._pages.vincitore import pagina_vincitore
 from cicerone.version_check import check_for_update
 
 # ---------- stato ----------
@@ -104,6 +105,11 @@ def banner_aggiornamento() -> None:
 def sidebar_stepper() -> None:
     step = st.session_state.step
 
+    if LOGO_PATH.exists():
+        col_l, col_c, col_r = st.sidebar.columns([1, 2, 1])
+        with col_c:
+            st.image(str(LOGO_PATH), use_container_width=True)
+
     st.sidebar.markdown(
         '<div class="cic-sidebar-title">Cicerone</div>'
         '<div class="cic-sidebar-caption">Assessment AI Readiness</div>',
@@ -125,8 +131,12 @@ def sidebar_stepper() -> None:
     st.sidebar.markdown('<div class="cic-divider">─── · ───</div>', unsafe_allow_html=True)
 
     raggiunte = st.session_state.get("fasi_raggiunte", {"onboarding"})
+    fasi_keys = [k for k, _ in FASI]
+    current_idx = fasi_keys.index(step) if step in fasi_keys else 0
     for n, (key, label) in enumerate(FASI):
-        sbloccata = key in raggiunte
+        # Sbloccata se: fase precedente alla corrente (back-nav libera)
+        # oppure già visitata in passato.
+        sbloccata = n <= current_idx or key in raggiunte
         attivo = key == step
         marker = "●" if attivo else " "
         button_label = f"{marker}  {ROMANI[n]}   {label}"
@@ -175,7 +185,8 @@ def sidebar_stepper() -> None:
 # ---------- entry point ----------
 
 def main() -> None:
-    st.set_page_config(page_title="Cicerone", page_icon=None, layout="centered")
+    page_icon = str(LOGO_PATH) if LOGO_PATH.exists() else None
+    st.set_page_config(page_title="Cicerone", page_icon=page_icon, layout="centered")
     inject_style()
     seed.run_if_needed()
     init_state()
