@@ -1,9 +1,9 @@
-"""Unit test per cicerone.llm.intervista.parse_risposta / domanda_per_criterio.
+"""Unit test per cicerone.llm.intervista.valuta_turno / domanda_per_criterio.
 
 NESSUNA chiamata di rete: il client Anthropic è monkeypatchato. `intervista.py`
 chiama `get_client().messages.create(...)` e legge `resp.content[0].text`.
 Costruiamo un fake client che ritorna un testo "canned" prefissato, così da
-pilotare i due rami di parse_risposta (needs_clarification vs parse normale).
+pilotare i tre rami di valuta_turno (chiudi / approfondisci / spiega).
 """
 import json
 
@@ -61,141 +61,185 @@ CRITERIO = {
 }
 CONTESTO = {"settore": "manifatturiero", "dimensione": "PMI 40 addetti"}
 
+HISTORY = [
+    {"role": "assistant", "content": "Quanto è centrale l'AI per voi?", "kind": "domanda"},
+    {"role": "user", "content": "Abbastanza importante."},
+]
 
-# --- Ramo A: needs_clarification --------------------------------------------
-def test_parse_ramo_clarification(patch_client):
+
+# --- Azione: chiudi ----------------------------------------------------------
+def test_valuta_turno_chiudi(patch_client):
     canned = json.dumps({
-        "needs_clarification": True,
-        "clarification_question": "In parole semplici: l'AI è una priorità per voi?",
-    })
-    patch_client(canned)
-
-    out = intervista.parse_risposta(CRITERIO, CONTESTO, "boh non ho capito")
-    assert out["needs_clarification"] is True
-    assert out["clarification_question"] == "In parole semplici: l'AI è una priorità per voi?"
-    # Nel ramo A non ci sono livello/peso.
-    assert "livello" not in out
-    assert "peso" not in out
-
-
-def test_parse_ramo_clarification_question_mancante_usa_default(patch_client):
-    canned = json.dumps({"needs_clarification": True})
-    patch_client(canned)
-    out = intervista.parse_risposta(CRITERIO, CONTESTO, "??")
-    assert out["needs_clarification"] is True
-    # Manca clarification_question -> fallback di default non vuoto.
-    assert isinstance(out["clarification_question"], str)
-    assert out["clarification_question"]
-
-
-# --- Ramo B: parse normale ---------------------------------------------------
-def test_parse_ramo_normale(patch_client):
-    canned = json.dumps({
-        "needs_clarification": False,
+        "azione": "chiudi",
         "livello": "Fondamentale",
         "motivazione": "Per loro l'AI è centrale nel piano industriale.",
         "ambiguo": False,
     })
     patch_client(canned)
 
-    out = intervista.parse_risposta(
-        CRITERIO, CONTESTO, "È assolutamente fondamentale per noi.")
-    assert out["needs_clarification"] is False
+    out = intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
+    assert out["azione"] == "chiudi"
     assert out["livello"] == "Fondamentale"
     assert out["peso"] == 10.0  # mapping LIVELLO_PESO
     assert out["motivazione"] == "Per loro l'AI è centrale nel piano industriale."
     assert out["ambiguo"] is False
 
 
-def test_parse_livello_sconosciuto_fallback(patch_client):
+def test_chiudi_livello_sconosciuto_fallback(patch_client):
     """Livello non in mappa -> fallback 'Abbastanza importante'."""
     canned = json.dumps({
-        "needs_clarification": False,
+        "azione": "chiudi",
         "livello": "Super Mega Critico",
         "motivazione": "x",
         "ambiguo": False,
     })
     patch_client(canned)
-    out = intervista.parse_risposta(CRITERIO, CONTESTO, "qualcosa")
+    out = intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
     assert out["livello"] == "Abbastanza importante"
     assert out["peso"] == 5.0
 
 
-def test_parse_livello_case_insensitive(patch_client):
+def test_chiudi_livello_case_insensitive(patch_client):
     """Match case-insensitive di un livello valido."""
     canned = json.dumps({
-        "needs_clarification": False,
+        "azione": "chiudi",
         "livello": "importante",  # minuscolo
         "motivazione": "x",
         "ambiguo": False,
     })
     patch_client(canned)
-    out = intervista.parse_risposta(CRITERIO, CONTESTO, "qualcosa")
+    out = intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
     assert out["livello"] == "Importante"
     assert out["peso"] == 7.5
 
 
-def test_parse_json_in_code_fence(patch_client):
-    """parse_risposta deve gestire JSON dentro ```json ... ``` (markdown)."""
+def test_chiudi_json_in_code_fence(patch_client):
+    """valuta_turno deve gestire JSON dentro ```json ... ``` (markdown)."""
     payload = {
-        "needs_clarification": False,
+        "azione": "chiudi",
         "livello": "Importante",
         "motivazione": "ok",
         "ambiguo": True,
     }
     canned = "```json\n" + json.dumps(payload) + "\n```"
     patch_client(canned)
-    out = intervista.parse_risposta(CRITERIO, CONTESTO, "abbastanza importante")
-    assert out["needs_clarification"] is False
+    out = intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
+    assert out["azione"] == "chiudi"
     assert out["livello"] == "Importante"
     assert out["ambiguo"] is True
 
 
-# --- Effetto di is_retry -----------------------------------------------------
-def test_is_retry_ignora_ramo_clarification(patch_client):
-    """Con is_retry=True, anche se l'LLM ritorna needs_clarification=True,
-    parse_risposta NON usa ramo A: forza il ramo B (best-effort)."""
+# --- Azione: approfondisci ---------------------------------------------------
+def test_valuta_turno_approfondisci(patch_client):
     canned = json.dumps({
-        "needs_clarification": True,
-        "clarification_question": "riprova...",
+        "azione": "approfondisci",
+        "domanda": "Avete già sperimentato strumenti AI in produzione?",
     })
     patch_client(canned)
+    out = intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
+    assert out["azione"] == "approfondisci"
+    assert out["domanda"] == "Avete già sperimentato strumenti AI in produzione?"
 
-    out = intervista.parse_risposta(
-        CRITERIO, CONTESTO, "non saprei davvero", is_retry=True)
-    assert out["needs_clarification"] is False
-    # Nessun livello fornito + retry -> default 'Abbastanza importante'.
+
+def test_approfondisci_senza_domanda_diventa_chiudi(patch_client):
+    """approfondisci senza una domanda valida -> fallback a chiusura."""
+    canned = json.dumps({"azione": "approfondisci", "domanda": ""})
+    patch_client(canned)
+    out = intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
+    assert out["azione"] == "chiudi"
+    assert out["livello"] == "Abbastanza importante"
+
+
+# --- Azione: spiega ----------------------------------------------------------
+def test_valuta_turno_spiega(patch_client):
+    canned = json.dumps({
+        "azione": "spiega",
+        "spiegazione": "Per strategia AI intendo se nel vostro piano c'è l'AI.",
+        "domanda": "Nel vostro settore manifatturiero, l'AI vi serve?",
+    })
+    patch_client(canned)
+    out = intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 0)
+    assert out["azione"] == "spiega"
+    assert out["spiegazione"]
+    assert out["domanda"] == "Nel vostro settore manifatturiero, l'AI vi serve?"
+
+
+def test_spiega_senza_domanda_usa_default(patch_client):
+    canned = json.dumps({
+        "azione": "spiega",
+        "spiegazione": "Spiegazione semplice.",
+    })
+    patch_client(canned)
+    out = intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 0)
+    assert out["azione"] == "spiega"
+    assert isinstance(out["domanda"], str) and out["domanda"]
+
+
+# --- forza_chiusura ----------------------------------------------------------
+def test_forza_chiusura_ignora_altre_azioni(patch_client):
+    """Con forza_chiusura=True, anche se l'LLM ritorna 'spiega' o
+    'approfondisci', valuta_turno chiude best-effort (ambiguo=True di default)."""
+    canned = json.dumps({
+        "azione": "spiega",
+        "spiegazione": "...",
+        "domanda": "riprova...",
+    })
+    patch_client(canned)
+    out = intervista.valuta_turno(
+        CRITERIO, CONTESTO, HISTORY, 3, forza_chiusura=True)
+    assert out["azione"] == "chiudi"
+    # Nessun livello fornito -> default 'Abbastanza importante'.
     assert out["livello"] == "Abbastanza importante"
     assert out["peso"] == 5.0
-    # ambiguo non specificato + is_retry=True -> default True.
+    # ambiguo non specificato + forza_chiusura=True -> default True.
     assert out["ambiguo"] is True
 
 
-def test_retry_false_vs_true_stesso_input(patch_client):
-    """Stesso output LLM 'needs_clarification', comportamento diverso per is_retry."""
+def test_forza_chiusura_preserva_livello_se_presente(patch_client):
+    """Se il modello fornisce un livello valido pur in forza_chiusura, lo usa."""
     canned = json.dumps({
-        "needs_clarification": True,
-        "clarification_question": "spiegami meglio",
+        "azione": "chiudi",
+        "livello": "Poco importante",
+        "motivazione": "Per loro conta poco.",
+        "ambiguo": False,
     })
-
     patch_client(canned)
-    out_no_retry = intervista.parse_risposta(CRITERIO, CONTESTO, "boh", is_retry=False)
-    assert out_no_retry["needs_clarification"] is True
+    out = intervista.valuta_turno(
+        CRITERIO, CONTESTO, HISTORY, 3, forza_chiusura=True)
+    assert out["azione"] == "chiudi"
+    assert out["livello"] == "Poco importante"
+    assert out["peso"] == 2.5
 
+
+# --- robustezza --------------------------------------------------------------
+def test_azione_sconosciuta_diventa_chiudi(patch_client):
+    """Azione non riconosciuta -> trattata come chiusura best-effort."""
+    canned = json.dumps({"azione": "boh", "livello": "Importante"})
     patch_client(canned)
-    out_retry = intervista.parse_risposta(CRITERIO, CONTESTO, "boh", is_retry=True)
-    assert out_retry["needs_clarification"] is False
+    out = intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
+    assert out["azione"] == "chiudi"
+    assert out["livello"] == "Importante"
 
 
-def test_parse_no_rete_nessun_client_reale(patch_client):
+def test_valuta_turno_no_rete_nessun_client_reale(patch_client):
     """Sanity: la call passa per il fake client (registra la create)."""
-    canned = json.dumps({"needs_clarification": False, "livello": "Importante",
+    canned = json.dumps({"azione": "chiudi", "livello": "Importante",
                          "motivazione": "x", "ambiguo": False})
     client = patch_client(canned)
-    intervista.parse_risposta(CRITERIO, CONTESTO, "test")
+    intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
     assert len(client.messages.calls) == 1
     # Conferma che il modello richiesto è quello configurato in intervista.
     assert client.messages.calls[0]["model"] == intervista.MODEL
+
+
+def test_valuta_turno_history_nel_prompt(patch_client):
+    """La conversazione (history) deve finire nel prompt user del modello."""
+    canned = json.dumps({"azione": "chiudi", "livello": "Importante",
+                         "motivazione": "x", "ambiguo": False})
+    client = patch_client(canned)
+    intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
+    user_msg = client.messages.calls[0]["messages"][0]["content"]
+    assert "Abbastanza importante." in user_msg  # contenuto risposta utente
 
 
 # --- domanda_per_criterio ----------------------------------------------------

@@ -74,7 +74,8 @@ FASI = [
 CHIAVI_RESET = (
     "step", "contesto_azienda", "assessment_id", "criteri", "idx_criterio",
     "intervista_domanda_corrente", "intervista_idx_corrente",
-    "intervista_ultima_parsed", "intervista_clarif_count", "intervista_chat",
+    "intervista_ultima_parsed", "intervista_risposte_valutate",
+    "intervista_turni_llm", "intervista_chat",
     "diag_domanda_corrente", "report_markdown", "fasi_raggiunte",
 )
 

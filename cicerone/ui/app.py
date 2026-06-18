@@ -44,7 +44,8 @@ def init_state() -> None:
     st.session_state.setdefault("intervista_domanda_corrente", None)
     st.session_state.setdefault("intervista_idx_corrente", None)
     st.session_state.setdefault("intervista_ultima_parsed", None)
-    st.session_state.setdefault("intervista_clarif_count", {})
+    st.session_state.setdefault("intervista_risposte_valutate", {})
+    st.session_state.setdefault("intervista_turni_llm", {})
     st.session_state.setdefault("intervista_chat", {})
     st.session_state.setdefault("diag_domanda_corrente", None)
     st.session_state.setdefault("report_markdown", None)
@@ -142,7 +143,7 @@ def sidebar_stepper() -> None:
         button_label = f"{marker}  {ROMANI[n]}   {label}"
         if st.sidebar.button(
             button_label,
-            key=f"nav_{key}",
+            key=("nav_attivo" if attivo else f"nav_{key}"),
             disabled=(not sbloccata) or attivo,
             use_container_width=True,
         ):

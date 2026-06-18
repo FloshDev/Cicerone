@@ -1,4 +1,5 @@
-"""Pagina intervista: una domanda per criterio, con clarification e parsing."""
+"""Pagina intervista: una domanda per criterio, con decisione guidata dal
+modello (chiudi / approfondisci / spiega) turno per turno."""
 from __future__ import annotations
 
 import streamlit as st
@@ -12,7 +13,12 @@ from cicerone.ui._pages._shared import (
     vai_a,
 )
 
-MAX_CLARIFICATIONS_INTERVISTA = 2  # re-domande max per criterio (in aggiunta alla domanda iniziale)
+# Paracadute (NON target): cap morbido sulle risposte valutabili per criterio.
+# Al raggiungimento, la risposta successiva forza la chiusura del modello.
+MAX_RISPOSTE_VALUTATE = 3
+# Soffitto assoluto anti-runaway: numero massimo di turni LLM per criterio,
+# solo protezione anti-loop.
+HARD_CEILING_TURNI = 10
 
 
 def pagina_intervista() -> None:
@@ -56,8 +62,11 @@ def pagina_intervista() -> None:
     # Render chat history del criterio
     for msg in history:
         with st.chat_message(msg["role"]):
-            if msg.get("kind") == "approfondimento":
+            kind = msg.get("kind")
+            if kind == "approfondimento":
                 st.markdown(f"_Approfondimento_ — {msg['content']}")
+            elif kind == "spiegazione":
+                st.markdown(f"_Chiarimento_ — {msg['content']}")
             else:
                 st.markdown(msg["content"])
 
@@ -88,37 +97,69 @@ def pagina_intervista() -> None:
         risposta_clean = risposta.strip()
         history.append({"role": "user", "content": risposta_clean})
 
-        clarif_count = st.session_state.intervista_clarif_count.get(criterio_id, 0)
-        # is_retry forza ramo B (parse anche se vago) all'ULTIMO tentativo permesso
-        is_retry = clarif_count >= MAX_CLARIFICATIONS_INTERVISTA
+        n_valutate = st.session_state.intervista_risposte_valutate.get(criterio_id, 0)
+        n_turni = st.session_state.intervista_turni_llm.get(criterio_id, 0)
+
+        # Paracadute: forza chiusura se raggiunti i cap (non sono target).
+        forza = (
+            n_valutate >= MAX_RISPOSTE_VALUTATE
+            or n_turni >= HARD_CEILING_TURNI
+        )
 
         with spinner_cicerone("Sto interpretando la tua risposta..."):
-            parsed = llm_intervista.parse_risposta(
-                criterio, contesto, risposta_clean, is_retry=is_retry
+            esito = llm_intervista.valuta_turno(
+                criterio, contesto, history, n_valutate, forza_chiusura=forza
             )
+        st.session_state.intervista_turni_llm[criterio_id] = n_turni + 1
 
-        # Clarification ammessa finché count < MAX
-        if parsed.get("needs_clarification") and clarif_count < MAX_CLARIFICATIONS_INTERVISTA:
-            st.session_state.intervista_clarif_count[criterio_id] = clarif_count + 1
-            nuova_domanda = (
-                parsed.get("clarification_question")
-                or "Puoi spiegare meglio cosa intendi? Anche un esempio concreto va bene."
-            )
-            history.append({"role": "assistant", "content": nuova_domanda, "kind": "approfondimento"})
-            st.session_state.intervista_domanda_corrente = nuova_domanda
+        azione = esito.get("azione")
+
+        if azione == "spiega":
+            spiegazione = esito.get("spiegazione", "")
+            nuova_domanda = esito.get("domanda", "")
+            contenuto = f"{spiegazione}\n\n{nuova_domanda}".strip() if spiegazione else nuova_domanda
+            history.append({
+                "role": "assistant",
+                "content": contenuto,
+                "kind": "spiegazione",
+            })
+            st.session_state.intervista_domanda_corrente = nuova_domanda or contenuto
             st.session_state.intervista_ultima_parsed = None
+            # "spiega" NON incrementa il contatore risposte valutabili.
             st.rerun()
 
-        # Salva e procedi (ramo B accettato, eventualmente con ambiguo=True)
+        if azione == "approfondisci":
+            nuova_domanda = (
+                esito.get("domanda")
+                or "Puoi farmi un esempio concreto?"
+            )
+            history.append({
+                "role": "assistant",
+                "content": nuova_domanda,
+                "kind": "approfondimento",
+            })
+            st.session_state.intervista_domanda_corrente = nuova_domanda
+            st.session_state.intervista_ultima_parsed = None
+            st.session_state.intervista_risposte_valutate[criterio_id] = n_valutate + 1
+            st.rerun()
+
+        # azione == "chiudi": salva e procedi.
+        st.session_state.intervista_risposte_valutate[criterio_id] = n_valutate + 1
+        parsed = {
+            "livello": esito.get("livello", "Abbastanza importante"),
+            "peso": esito.get("peso", 5.0),
+            "motivazione": esito.get("motivazione") or risposta_clean,
+            "ambiguo": esito.get("ambiguo", False),
+        }
         st.session_state.intervista_ultima_parsed = parsed
         repo.salva_peso(
             assessment_id=st.session_state.assessment_id,
             criterio_id=criterio_id,
-            livello=parsed.get("livello", "Abbastanza importante"),
-            peso=parsed.get("peso", 5.0),
-            motivazione=parsed.get("motivazione") or risposta_clean,
+            livello=parsed["livello"],
+            peso=parsed["peso"],
+            motivazione=parsed["motivazione"],
             trascrizione=risposta_clean,
-            ambiguo=parsed.get("ambiguo", False),
+            ambiguo=parsed["ambiguo"],
         )
         st.session_state.idx_criterio = i + 1
         st.session_state.intervista_domanda_corrente = None

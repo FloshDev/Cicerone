@@ -73,13 +73,13 @@ header[data-testid="stHeader"] {
     text-align: center;
 }
 
-/* Divisore in stile classico: ─── · ─── */
+/* Divisore in stile classico: ─── · ─── — più marcato, margini ridotti */
 .cic-divider {
     text-align: center;
-    color: var(--cic-text-muted);
+    color: #5a5a5a;
     font-size: 0.95rem;
     letter-spacing: 0.4em;
-    margin: 1.4rem 0;
+    margin: 0.7rem 0;
     user-select: none;
 }
 
@@ -121,13 +121,16 @@ header[data-testid="stHeader"] {
     background: transparent;
 }
 
-/* Stepper sidebar: numeri romani */
+/* Stepper sidebar: numeri romani — lista compatta */
 .cic-step {
     display: flex;
     align-items: baseline;
-    gap: 0.8rem;
-    margin: 0.35rem 0;
+    gap: 0.75rem;
+    margin: 0.1rem 0;
+    padding: 0.3rem 0.55rem;
     font-size: 0.95rem;
+    border-left: 3px solid transparent;
+    border-radius: 5px;
 }
 
 .cic-step-num {
@@ -139,17 +142,24 @@ header[data-testid="stHeader"] {
     color: var(--cic-text-muted);
 }
 
+/* Step attivo: barra ambrata a sinistra, sfondo tenue, label in bold */
+.cic-step.cic-active {
+    border-left-color: var(--cic-amber);
+    background: rgba(232, 184, 75, 0.10);
+}
+
 .cic-step.cic-active .cic-step-num {
     color: var(--cic-amber);
 }
 
 .cic-step.cic-active .cic-step-label {
-    color: inherit;
+    color: #D4D4D4;
     font-weight: 600;
 }
 
+/* Step inattivi: grigio leggermente più leggibile del muted, sobrio */
 .cic-step:not(.cic-active) .cic-step-label {
-    color: var(--cic-text-muted);
+    color: #6a6a6a;
 }
 
 /* Badge stato API key in sidebar */
@@ -175,15 +185,17 @@ header[data-testid="stHeader"] {
 [data-testid="stSidebar"] .stButton button {
     background: transparent !important;
     border: none !important;
+    border-left: 3px solid transparent !important;
     box-shadow: none !important;
     text-align: left !important;
-    color: var(--cic-text-muted) !important;
+    color: #6a6a6a !important;
     font-family: 'Cormorant Garamond', Garamond, serif;
-    font-size: 1.02rem;
-    padding: 0.4rem 0.5rem !important;
-    margin: 0.1rem 0 !important;
-    border-radius: 6px !important;
-    line-height: 1.3 !important;
+    font-size: 1.05rem;
+    padding: 0.34rem 0.6rem !important;
+    margin: 0.04rem 0 !important;
+    border-radius: 5px !important;
+    line-height: 1.25 !important;
+    transition: background 0.12s ease, color 0.12s ease;
 }
 
 [data-testid="stSidebar"] .stButton button:hover:not(:disabled) {
@@ -191,10 +203,45 @@ header[data-testid="stHeader"] {
     color: var(--cic-amber) !important;
 }
 
+/* Bottoni sidebar disabilitati (step bloccati/futuri + "Nuova PMI"): muti.
+   Regola generica — viene PRIMA così lo step attivo (più specifico, sotto)
+   la vince e resta ambrato. */
 [data-testid="stSidebar"] .stButton button:disabled {
-    opacity: 0.55 !important;
+    opacity: 0.5 !important;
     cursor: not-allowed !important;
     color: var(--cic-text-muted) !important;
+}
+
+/* SOLO lo step attivo (key dedicata nav_attivo, bottone disabilitato col
+   marker ●): barra ambrata a sinistra, sfondo ambrato tenue, label ambrata
+   bold. Isolato su nav_attivo così gli step bloccati NON si colorano. */
+[data-testid="stSidebar"] [class*="st-key-nav_attivo"] .stButton button:disabled,
+[data-testid="stSidebar"] [class*="st-key-nav_attivo"] button:disabled {
+    cursor: default !important;
+    border-left-color: var(--cic-amber) !important;
+    background: rgba(232, 184, 75, 0.10) !important;
+    color: var(--cic-amber) !important;
+    font-weight: 600 !important;
+    opacity: 1 !important;
+}
+
+/* Progress "Criterio X/10" in sidebar: barra ambrata, etichetta più decisa. */
+[data-testid="stSidebar"] [data-testid="stProgress"] [data-testid="stProgressBar"] > div,
+[data-testid="stSidebar"] .stProgress > div > div > div > div {
+    background-color: var(--cic-amber) !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stProgress"] p,
+[data-testid="stSidebar"] .stProgress p {
+    font-family: 'Cormorant Garamond', Garamond, serif;
+    font-size: 1rem;
+    color: #D4D4D4 !important;
+    letter-spacing: 0.01em;
+}
+
+/* Riga "API key: <badge>" in sidebar: etichetta in muted, centrata. */
+[data-testid="stSidebar"] .cic-badge {
+    margin-left: 0.3rem;
 }
 
 /* Top 3 framework: cards verticali stacked, nomi wrappabili. */

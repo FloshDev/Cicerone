@@ -1,10 +1,14 @@
 """Intervista LLM-guidata: una domanda per criterio adattata al contesto
-azienda, parsing risposta libera utente in (livello, peso, motivazione, ambiguo).
+azienda, e valutazione turno-per-turno della conversazione con decisione
+guidata dal modello (chiudi / approfondisci / spiega).
 
 API:
     domanda_per_criterio(criterio, contesto) -> str
-    parse_risposta(criterio, contesto, risposta_libera) -> dict
-        keys: livello, peso, motivazione, ambiguo
+    valuta_turno(criterio, contesto, history, n_risposte_valutate,
+                 forza_chiusura=False) -> dict
+        azione "chiudi":        keys azione, livello, peso, motivazione, ambiguo
+        azione "approfondisci": keys azione, domanda
+        azione "spiega":        keys azione, spiegazione, domanda
 """
 import json
 
@@ -59,98 +63,141 @@ Genera la domanda."""
     return resp.content[0].text.strip()
 
 
-def parse_risposta(criterio: dict, contesto: dict | None,
-                   risposta_libera: str, is_retry: bool = False) -> dict:
-    """Parsa risposta utente in livello/peso/motivazione/ambiguo,
-    o richiede chiarimento se l'utente non ha capito / risposta inutilizzabile.
+def _strip_json_fence(testo: str) -> str:
+    """Rimuove un eventuale fence markdown ```json ... ``` attorno al JSON."""
+    testo = testo.strip()
+    if testo.startswith("```"):
+        testo = testo.split("```")[1]
+        if testo.startswith("json"):
+            testo = testo[4:]
+        testo = testo.strip()
+    return testo
 
-    Se `is_retry=False` e la risposta è palesemente non-comprensione
-    (es. "non ho capito", "boh", "non saprei", domanda di rimando, vuoto):
-        ritorna {"needs_clarification": True,
-                 "clarification_question": "<riformulazione semplificata>"}
 
-    Altrimenti ritorna:
-        {"needs_clarification": False,
-         "livello": str,
-         "peso": float,
-         "motivazione": str,
-         "ambiguo": bool}
+def _history_str(history: list[dict] | None) -> str:
+    """Rende la conversazione del criterio in testo leggibile per il modello."""
+    if not history:
+        return "(nessuno scambio finora)"
+    righe = []
+    for m in history:
+        ruolo = "CICERONE" if m.get("role") == "assistant" else "UTENTE"
+        righe.append(f"{ruolo}: {m.get('content', '').strip()}")
+    return "\n".join(righe)
 
-    Se `is_retry=True` e la risposta è ancora vaga, accetta best-effort
-    (ambiguo=True) e prosegue.
+
+def valuta_turno(criterio: dict, contesto: dict | None,
+                 history: list[dict], n_risposte_valutate: int,
+                 forza_chiusura: bool = False) -> dict:
+    """Valuta lo stato della conversazione su un criterio e decide il prossimo
+    passo. Il modello sceglie autonomamente fra tre azioni.
+
+    Parametri:
+        history: tutta la conversazione del criterio corrente, lista di dict
+            {"role": "assistant"|"user", "content": str} in ordine cronologico.
+        n_risposte_valutate: quante risposte valutabili l'utente ha già dato.
+        forza_chiusura: se True il modello DEVE ritornare azione "chiudi"
+            best-effort (non può più chiedere altro).
+
+    Ritorna un dict con chiave "azione":
+        "chiudi"        -> {azione, livello, peso, motivazione, ambiguo}
+        "approfondisci" -> {azione, domanda}
+        "spiega"        -> {azione, spiegazione, domanda}
     """
     livelli = list(LIVELLO_PESO.keys())
 
-    system = f"""Sei un parser strutturato per un'intervista AI Readiness.
-Devi analizzare la risposta libera di un utente a una domanda su un criterio
-MCDA, e DECIDERE una di queste due strade:
+    system = f"""Sei Cicerone, consulente AI Readiness per PMI italiane. Stai
+conducendo un'intervista su UN criterio alla volta per capire QUANTO quel
+criterio è importante PER LA SPECIFICA AZIENDA dell'utente.
 
-A) Se la risposta è inutilizzabile per inferire l'importanza del criterio
-   (esempi: "non ho capito", "boh", "non saprei", "che vuol dire?", risposta
-   vuota, risposta che chiede chiarimento sulla domanda, parole sole tipo
-   "abbastanza" senza contesto):
-   → ritorna `{{"needs_clarification": true,
-                "clarification_question": "<una riformulazione MOLTO più
-                semplice e concreta della domanda, max 2 righe, in italiano,
-                con un esempio concreto adatto al settore se possibile>"}}`
+Hai davanti tutta la conversazione finora su questo criterio. Devi decidere il
+prossimo passo scegliendo UNA fra tre azioni:
 
-B) Se la risposta contiene informazione utile (anche imperfetta):
-   → ritorna `{{"needs_clarification": false,
-                "livello": "<uno di: {', '.join(livelli)}>",
-                "motivazione": "<sintesi 1-2 frasi della risposta utente>",
-                "ambiguo": <true se l'inferenza è incerta, false altrimenti>}}`
+1) "chiudi" — quando dalla conversazione hai informazioni SUFFICIENTI per
+   inferire quanto il criterio è importante per questa azienda. Non serve
+   essere certi al 100%: chiudi appena hai abbastanza per una stima ragionevole.
+   Formato:
+   {{"azione": "chiudi",
+     "livello": "<uno di: {', '.join(livelli)}>",
+     "motivazione": "<sintesi 1-2 frasi di cosa emerge dalle risposte>",
+     "ambiguo": <true se l'inferenza resta incerta, false altrimenti>}}
 
-{'IMPORTANTE: questo è il SECONDO tentativo. Anche se la risposta è ancora vaga, NON usare ramo A. Usa ramo B con ambiguo=true, scegliendo il livello che meglio approssima.' if is_retry else ''}
+2) "approfondisci" — quando la risposta è utile ma superficiale e UNA domanda
+   mirata di follow-up ti farebbe capire meglio. Formato:
+   {{"azione": "approfondisci",
+     "domanda": "<UNA domanda di follow-up mirata, max 2 righe, italiano>"}}
+
+3) "spiega" — quando l'utente è confuso o non ha capito la domanda (es. "non
+   ho capito", "boh", "che vuol dire?", risposta fuori tema, richiesta di
+   chiarimento). NON abbandonarlo mai: SPIEGA il concetto in modo semplice e
+   concreto, usando il SETTORE/contesto azienda e le risposte già date come
+   esempi, POI riproponi una domanda riformulata più semplice. Formato:
+   {{"azione": "spiega",
+     "spiegazione": "<spiegazione semplice e concreta, con esempio adatto al
+       settore dell'azienda>",
+     "domanda": "<la domanda riformulata in modo più semplice, max 2 righe>"}}
+
+Filosofia (IMPORTANTE):
+- NON forzare un numero fisso di domande. Chiudi appena hai info sufficienti.
+- Non insistere oltre il necessario se l'utente è già stato chiaro.
+- Non abbandonare mai un utente confuso: se non ha capito, preferisci "spiega"
+  a "chiudi".
+{'- ATTENZIONE: devi CHIUDERE adesso. Usa SEMPRE azione "chiudi" con la migliore approssimazione possibile dalle info disponibili (ambiguo=true se incerto). Non usare "approfondisci" né "spiega".' if forza_chiusura else ''}
 
 Output: SOLO JSON valido, niente altro."""
 
     user = f"""Criterio: {criterio['nomeCriterio']}
 Definizione: {criterio['definizione']}
 Contesto azienda: {_contesto_str(contesto)}
+Risposte valutabili già date dall'utente su questo criterio: {n_risposte_valutate}
 
-Risposta libera dell'utente:
+Conversazione finora su questo criterio:
 \"\"\"
-{risposta_libera}
+{_history_str(history)}
 \"\"\"
 
-Decidi ramo A o B e ritorna il JSON."""
+Decidi l'azione e ritorna SOLO il JSON."""
 
     resp = get_client().messages.create(
         model=MODEL,
-        max_tokens=500,
+        max_tokens=600,
         system=system,
         messages=[{"role": "user", "content": user}],
     )
-    testo = resp.content[0].text.strip()
+    parsed = json.loads(_strip_json_fence(resp.content[0].text))
 
-    if testo.startswith("```"):
-        testo = testo.split("```")[1]
-        if testo.startswith("json"):
-            testo = testo[4:]
-        testo = testo.strip()
+    azione = parsed.get("azione")
 
-    parsed = json.loads(testo)
+    # forza_chiusura o azione non riconosciuta: tratta come chiusura best-effort.
+    if forza_chiusura or azione not in ("chiudi", "approfondisci", "spiega"):
+        azione = "chiudi"
 
-    # Ramo A: chiarimento
-    if parsed.get("needs_clarification") and not is_retry:
+    if azione == "approfondisci":
+        domanda = (parsed.get("domanda") or "").strip()
+        if not domanda:
+            azione = "chiudi"
+        else:
+            return {"azione": "approfondisci", "domanda": domanda}
+
+    if azione == "spiega":
         return {
-            "needs_clarification": True,
-            "clarification_question": parsed.get(
-                "clarification_question",
-                "Mi spiego meglio: quanto è importante questo aspetto per la tua azienda, su una scala da 'per nulla' a 'fondamentale'?",
+            "azione": "spiega",
+            "spiegazione": (parsed.get("spiegazione") or "").strip(),
+            "domanda": (
+                parsed.get("domanda")
+                or "Detto semplicemente: quanto conta questo aspetto per la tua azienda?"
             ).strip(),
         }
 
-    # Ramo B: parse normale (anche se LLM tentava chiarimento ma è retry)
+    # azione == "chiudi" (o fallback)
     livello = parsed.get("livello") or "Abbastanza importante"
     if livello not in LIVELLO_PESO:
         match = next((liv for liv in livelli if liv.lower() == livello.lower()), None)
         livello = match or "Abbastanza importante"
 
     return {
-        "needs_clarification": False,
+        "azione": "chiudi",
         "livello": livello,
         "peso": LIVELLO_PESO[livello],
-        "motivazione": parsed.get("motivazione", "").strip(),
-        "ambiguo": bool(parsed.get("ambiguo", bool(is_retry))),
+        "motivazione": (parsed.get("motivazione") or "").strip(),
+        "ambiguo": bool(parsed.get("ambiguo", bool(forza_chiusura))),
     }
