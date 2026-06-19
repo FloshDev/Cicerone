@@ -242,6 +242,30 @@ def test_valuta_turno_history_nel_prompt(patch_client):
     assert "Abbastanza importante." in user_msg  # contenuto risposta utente
 
 
+def test_json_malformato_non_crasha_chiude_best_effort(patch_client):
+    """JSON invalido dal modello (es. virgoletta non-escaped dentro una
+    stringa, caso reale Oil&gas) NON deve propagare JSONDecodeError fino alla
+    UI: valuta_turno degrada in una chiusura sicura (ambiguo=True)."""
+    canned = '{"azione": "chiudi", "livello": "Importante", "motivazione": "standard "API 6D"", "ambiguo": false}'
+    patch_client(canned)
+    out = intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
+    assert out["azione"] == "chiudi"
+    assert out["livello"] in intervista.LIVELLO_PESO
+    assert out["ambiguo"] is True
+
+
+def test_output_struttura_json_schema_richiesto(patch_client):
+    """valuta_turno deve richiedere structured outputs (output_config.format)
+    per forzare JSON valido lato modello."""
+    canned = json.dumps({"azione": "chiudi", "livello": "Importante",
+                         "motivazione": "x", "ambiguo": False})
+    client = patch_client(canned)
+    intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
+    fmt = client.messages.calls[0].get("output_config", {}).get("format", {})
+    assert fmt.get("type") == "json_schema"
+    assert "schema" in fmt
+
+
 # --- domanda_per_criterio ----------------------------------------------------
 def test_domanda_per_criterio(patch_client):
     patch_client("  Quanto è centrale l'AI nella vostra strategia produttiva?  ")

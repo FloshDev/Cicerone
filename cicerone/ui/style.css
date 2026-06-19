@@ -1,5 +1,7 @@
-/* Cicerone — identità visiva minimal
-   Accento ambrato unico, font serif per header, divisori sottili. */
+/* Cicerone — tool SaaS moderno.
+   Sans-serif uniforme nel corpo; serif Cormorant SOLO nel wordmark sidebar.
+   Oro #E8B84B = accento funzionale (bottone primario, step attivo, focus ring,
+   punteggi MCDA, progress). Niente oro decorativo. */
 
 /* Nasconde elementi default Streamlit (Deploy, hamburger, badge "Made with") */
 [data-testid="stToolbar"],
@@ -20,83 +22,121 @@ header[data-testid="stHeader"] {
 
 :root {
     --cic-amber: #E8B84B;
-    --cic-amber-dark: #C99B30;
-    --cic-text-muted: #7A7A7A;
-    --cic-border: rgba(58, 58, 58, 0.3);
+    --cic-amber-dark: #B8881F;
+    --cic-text: #1F2329;
+    --cic-text-muted: #6b6b6b;
+    --cic-border: #e2dccd;
+    --cic-border-strong: #cfc9ba;
+    --cic-track: #ece8dd;
     --cic-error: #E85B4B;
-    --cic-success: #4BE87A;
+    --cic-success: #2ea043;
 }
 
-/* Header principale dell'app — il "wordmark" */
-.cic-header {
-    font-family: 'Cormorant Garamond', Garamond, 'Libre Caslon Text', serif;
-    font-weight: 500;
-    font-size: 3.2rem;
-    line-height: 1;
-    letter-spacing: 0.02em;
-    margin: 0 0 0.2rem 0;
-    display: inline-block;
-    border-bottom: 2px solid var(--cic-amber);
-    padding-bottom: 0.15rem;
-}
-
-.cic-tagline {
-    font-family: 'Cormorant Garamond', Garamond, serif;
-    font-style: italic;
-    color: var(--cic-text-muted);
-    font-size: 1.1rem;
-    margin: 0.2rem 0 1.6rem 0;
-}
-
-/* Sidebar wordmark */
+/* ---------- Sidebar wordmark (UNICO uso serif) ---------- */
 .cic-sidebar-title {
     font-family: 'Cormorant Garamond', Garamond, serif;
-    font-weight: 500;
-    font-size: 1.9rem;
+    font-weight: 600;
+    font-size: 1.8rem;
     line-height: 1;
-    letter-spacing: 0.02em;
-    margin: 0.4rem 0 0.1rem 0;
+    letter-spacing: 0.01em;
+    margin: 0.3rem 0 0.15rem 0;
     text-align: center;
-}
-
-/* Logo sidebar: padding ridotto, immagine compatta */
-[data-testid="stSidebar"] [data-testid="stImage"] {
-    margin: 0.2rem 0 0.6rem 0;
+    color: var(--cic-text);
 }
 
 .cic-sidebar-caption {
-    font-family: 'Cormorant Garamond', Garamond, serif;
-    font-style: italic;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
     color: var(--cic-text-muted);
-    font-size: 0.95rem;
-    margin: 0 0 1rem 0;
+    font-size: 0.7rem;
+    font-weight: 500;
+    margin: 0 0 0.9rem 0;
     text-align: center;
 }
 
-/* Divisore in stile classico: ─── · ─── — più marcato, margini ridotti */
-.cic-divider {
-    text-align: center;
-    color: #5a5a5a;
-    font-size: 0.95rem;
-    letter-spacing: 0.4em;
-    margin: 0.7rem 0;
-    user-select: none;
+/* Logo sidebar: compatto */
+[data-testid="stSidebar"] [data-testid="stImage"] {
+    margin: 0.2rem 0 0.5rem 0;
 }
 
-/* Bordo sottile sulla sidebar */
+/* Bordo sottile neutro sulla sidebar */
 [data-testid="stSidebar"] {
-    border-right: 1px solid var(--cic-amber);
+    border-right: 1px solid var(--cic-border);
 }
 
-/* Bottoni primary — sfondo ambrato, testo nero */
+/* ---------- Wizard header (breadcrumb in cima al contenuto) ---------- */
+.cic-wizard {
+    margin: 0 0 1.4rem 0;
+}
+
+.cic-wizard-eyebrow {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--cic-text-muted);
+    margin: 0 0 0.2rem 0;
+}
+
+.cic-wizard-title {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 1.55rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--cic-text);
+    margin: 0 0 0.7rem 0;
+}
+
+.cic-wizard-track {
+    height: 4px;
+    width: 100%;
+    background: var(--cic-track);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.cic-wizard-fill {
+    height: 100%;
+    background: var(--cic-amber);
+    border-radius: 999px;
+}
+
+.cic-wizard-sub {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 0.8rem;
+    color: var(--cic-text-muted);
+    margin: 0.55rem 0 0 0;
+}
+
+/* Sotto-riga intervista: contatore piccolo oro + NOME criterio prominente. */
+.cic-crit-count {
+    display: inline-block;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: var(--cic-amber-dark);
+}
+.cic-crit-name {
+    display: block;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--cic-text);
+    line-height: 1.3;
+    margin-top: 0.1rem;
+}
+
+/* ---------- Bottoni primary — sfondo ambrato, testo scuro ---------- */
 .stButton > button[kind="primary"],
 .stFormSubmitButton > button[kind="primary"],
 .stDownloadButton > button[kind="primary"] {
     background-color: var(--cic-amber);
-    color: #111;
+    color: #1a1a1a;
     border: 1px solid var(--cic-amber);
-    border-radius: 6px;
-    font-weight: 500;
+    border-radius: 8px;
+    font-weight: 600;
 }
 
 .stButton > button[kind="primary"]:hover,
@@ -104,15 +144,59 @@ header[data-testid="stHeader"] {
 .stDownloadButton > button[kind="primary"]:hover {
     background-color: var(--cic-amber-dark);
     border-color: var(--cic-amber-dark);
-    color: #111;
+    color: #fff;
 }
 
 /* Bottoni secondari sobri */
 .stButton > button:not([kind="primary"]) {
-    border-radius: 6px;
+    border-radius: 8px;
 }
 
-/* Bubble chat — bordo sottile, padding generoso, no ombra forte */
+/* ---------- Input bianchi + focus ring oro ----------
+   DOM reale (verificato nel bundle Streamlit):
+   stTextInput > label + div[data-testid="stTextInputRootElement"]  (← box grigio
+   bordato che racchiude <input> E l'occhio stTextInputIcon). Quindi bordo/sfondo
+   vanno sul RootElement; input e icona restano trasparenti dentro. */
+[data-testid="stTextInputRootElement"],
+[data-testid="stTextArea"] div[data-baseweb="base-input"],
+[data-testid="stSelectbox"] [data-baseweb="select"] > div {
+    background-color: #fff !important;
+    border: 1px solid var(--cic-border-strong) !important;
+    border-radius: 8px !important;
+}
+
+/* Tutto ciò che sta dentro: trasparente, niente bordo/box grigio interno. */
+[data-testid="stTextInputRootElement"] > div,
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--cic-text) !important;
+}
+
+/* Focus ring oro sul contenitore. */
+[data-testid="stTextInputRootElement"]:focus-within,
+[data-testid="stTextArea"] div[data-baseweb="base-input"]:focus-within,
+[data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within {
+    border-color: var(--cic-amber) !important;
+    box-shadow: 0 0 0 3px rgba(232, 184, 75, 0.18) !important;
+}
+
+/* Occhio mostra/nascondi (stTextInputIcon): trasparente, dentro al bordo. */
+[data-testid="stTextInputIcon"],
+[data-testid="stTextInput"] button,
+[data-testid="stTextInput"] button > div {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+[data-testid="stTextInput"] button:hover {
+    background-color: #f3f0e8 !important;
+    border-radius: 6px !important;
+}
+
+/* ---------- Chat bubble — bordo tenue uniforme ---------- */
 [data-testid="stChatMessage"] {
     border: 1px solid var(--cic-border);
     border-radius: 10px;
@@ -121,111 +205,65 @@ header[data-testid="stHeader"] {
     background: transparent;
 }
 
-/* Stepper sidebar: numeri romani — lista compatta */
-.cic-step {
-    display: flex;
-    align-items: baseline;
-    gap: 0.75rem;
-    margin: 0.1rem 0;
-    padding: 0.3rem 0.55rem;
-    font-size: 0.95rem;
-    border-left: 3px solid transparent;
-    border-radius: 5px;
-}
-
-.cic-step-num {
-    font-family: 'Cormorant Garamond', Garamond, serif;
-    font-weight: 500;
-    font-size: 1.15rem;
-    min-width: 1.8rem;
-    text-align: right;
-    color: var(--cic-text-muted);
-}
-
-/* Step attivo: barra ambrata a sinistra, sfondo tenue, label in bold */
-.cic-step.cic-active {
-    border-left-color: var(--cic-amber);
-    background: rgba(232, 184, 75, 0.10);
-}
-
-.cic-step.cic-active .cic-step-num {
-    color: var(--cic-amber);
-}
-
-.cic-step.cic-active .cic-step-label {
-    color: #D4D4D4;
-    font-weight: 600;
-}
-
-/* Step inattivi: grigio leggermente più leggibile del muted, sobrio */
-.cic-step:not(.cic-active) .cic-step-label {
-    color: #6a6a6a;
-}
-
-/* Badge stato API key in sidebar */
-.cic-badge {
-    display: inline-block;
-    padding: 0.15rem 0.55rem;
-    border-radius: 999px;
-    font-size: 0.78rem;
-    font-weight: 500;
-    border: 1px solid currentColor;
-}
-
-.cic-badge-ok    { color: var(--cic-success); }
-.cic-badge-ko    { color: var(--cic-error); }
-.cic-badge-idle  { color: var(--cic-text-muted); }
-
-/* Esito verifica chiave sotto il bottone */
-.cic-key-ok { color: var(--cic-success); font-weight: 500; }
-.cic-key-ko { color: var(--cic-error); font-weight: 500; }
-
-/* Sidebar nav: bottoni che sostituiscono lo stepper markdown.
-   Allineati a sinistra, sfondo trasparente, hover ambrato. */
+/* ---------- Stepper sidebar: pallini numerati ---------- */
+/* I bottoni di navigazione restano bottoni Streamlit, ristilizzati. */
 [data-testid="stSidebar"] .stButton button {
     background: transparent !important;
     border: none !important;
-    border-left: 3px solid transparent !important;
     box-shadow: none !important;
     text-align: left !important;
-    color: #6a6a6a !important;
-    font-family: 'Cormorant Garamond', Garamond, serif;
-    font-size: 1.05rem;
-    padding: 0.34rem 0.6rem !important;
-    margin: 0.04rem 0 !important;
-    border-radius: 5px !important;
+    color: var(--cic-text) !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    font-size: 0.92rem !important;
+    font-weight: 500 !important;
+    padding: 0.36rem 0.5rem !important;
+    margin: 0.05rem 0 !important;
+    border-radius: 8px !important;
     line-height: 1.25 !important;
     transition: background 0.12s ease, color 0.12s ease;
 }
 
 [data-testid="stSidebar"] .stButton button:hover:not(:disabled) {
     background: rgba(232, 184, 75, 0.10) !important;
-    color: var(--cic-amber) !important;
 }
 
-/* Bottoni sidebar disabilitati (step bloccati/futuri + "Nuova PMI"): muti.
-   Regola generica — viene PRIMA così lo step attivo (più specifico, sotto)
-   la vince e resta ambrato. */
+/* Step bloccati/futuri + bottoni disabilitati: muti. Regola generica PRIMA
+   così lo step attivo (più specifico, sotto) la vince. */
 [data-testid="stSidebar"] .stButton button:disabled {
-    opacity: 0.5 !important;
+    opacity: 1 !important;
     cursor: not-allowed !important;
-    color: var(--cic-text-muted) !important;
+    color: #9a9a9a !important;
 }
 
-/* SOLO lo step attivo (key dedicata nav_attivo, bottone disabilitato col
-   marker ●): barra ambrata a sinistra, sfondo ambrato tenue, label ambrata
-   bold. Isolato su nav_attivo così gli step bloccati NON si colorano. */
+/* SOLO lo step attivo (key nav_attivo): label scura bold, sfondo ambrato tenue. */
 [data-testid="stSidebar"] [class*="st-key-nav_attivo"] .stButton button:disabled,
 [data-testid="stSidebar"] [class*="st-key-nav_attivo"] button:disabled {
     cursor: default !important;
-    border-left-color: var(--cic-amber) !important;
-    background: rgba(232, 184, 75, 0.10) !important;
-    color: var(--cic-amber) !important;
+    background: rgba(232, 184, 75, 0.12) !important;
+    color: var(--cic-text) !important;
     font-weight: 600 !important;
     opacity: 1 !important;
 }
 
-/* Progress "Criterio X/10" in sidebar: barra ambrata, etichetta più decisa. */
+/* "Ricomincia": è un'AZIONE, non una voce di nav. Bottone outline centrato,
+   coerente col box bordato di "Manutenzione" sotto, distinto dai pallini
+   numerati degli step. (key dedicata `sidebar_restart`.) */
+[data-testid="stSidebar"] [class*="st-key-sidebar_restart"] button {
+    text-align: center !important;
+    justify-content: center !important;
+    border: 1px solid var(--cic-border-strong) !important;
+    border-radius: 8px !important;
+    color: var(--cic-text) !important;
+    font-weight: 500 !important;
+    padding: 0.45rem 0.6rem !important;
+}
+[data-testid="stSidebar"] [class*="st-key-sidebar_restart"] button:hover:not(:disabled) {
+    border-color: var(--cic-amber) !important;
+    color: var(--cic-amber-dark) !important;
+    background: rgba(232, 184, 75, 0.08) !important;
+}
+
+/* Progress "Criterio X/N" in sidebar */
 [data-testid="stSidebar"] [data-testid="stProgress"] [data-testid="stProgressBar"] > div,
 [data-testid="stSidebar"] .stProgress > div > div > div > div {
     background-color: var(--cic-amber) !important;
@@ -233,70 +271,215 @@ header[data-testid="stHeader"] {
 
 [data-testid="stSidebar"] [data-testid="stProgress"] p,
 [data-testid="stSidebar"] .stProgress p {
-    font-family: 'Cormorant Garamond', Garamond, serif;
-    font-size: 1rem;
-    color: #D4D4D4 !important;
-    letter-spacing: 0.01em;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 0.82rem;
+    color: var(--cic-text-muted) !important;
 }
 
-/* Riga "API key: <badge>" in sidebar: etichetta in muted, centrata. */
-[data-testid="stSidebar"] .cic-badge {
-    margin-left: 0.3rem;
+/* Badge stato API key in sidebar: pill sobria */
+.cic-badge {
+    display: inline-block;
+    padding: 0.12rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    border: 1px solid currentColor;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* Top 3 framework: cards verticali stacked, nomi wrappabili. */
-.cic-cards {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    margin: 0.6rem 0 1rem 0;
-}
+.cic-badge-ok    { color: var(--cic-success); }
+.cic-badge-ko    { color: var(--cic-error); }
+.cic-badge-idle  { color: var(--cic-text-muted); }
 
-.cic-card {
+/* Riga "API key" in sidebar: centrata, label uppercase muted coerente col
+   resto (come la caption "AI REDINESS"), pill di stato accanto. */
+.cic-apikey-row {
     display: flex;
     align-items: center;
-    gap: 1.2rem;
-    padding: 0.9rem 1.1rem;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 0.1rem 0 0.2rem;
+}
+.cic-apikey-label {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+    color: var(--cic-text-muted);
+}
+
+/* Esito verifica chiave sotto il bottone */
+.cic-key-ok { color: var(--cic-success); font-weight: 600; }
+.cic-key-ko { color: var(--cic-error); font-weight: 600; }
+
+/* ---------- Card micro-header (onboarding) ---------- */
+.cic-card-header {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--cic-text);
+    margin: 0 0 0.1rem 0;
+}
+
+/* ---------- Vincitore: hero ---------- */
+.cic-hero {
     border: 1px solid var(--cic-border);
-    border-radius: 10px;
-    background: transparent;
+    border-left: 4px solid var(--cic-amber);
+    border-radius: 12px;
+    padding: 1.2rem 1.4rem;
+    margin: 0.6rem 0 1.4rem 0;
+    background: #fff;
 }
 
-.cic-card-medal {
-    font-family: 'Cormorant Garamond', Garamond, serif;
-    font-size: 1.8rem;
+.cic-hero-label {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--cic-text-muted);
+    margin: 0 0 0.25rem 0;
+}
+
+.cic-hero-name {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--cic-text);
+    margin: 0 0 0.5rem 0;
+}
+
+.cic-hero-score {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--cic-amber-dark);
     line-height: 1;
-    color: var(--cic-amber);
-    min-width: 2.4rem;
-    text-align: center;
-    font-weight: 500;
+    margin: 0 0 0.6rem 0;
 }
 
-.cic-card-body {
+.cic-hero-score small {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--cic-text-muted);
+}
+
+.cic-hero-why {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 0.88rem;
+    color: var(--cic-text-muted);
+    margin: 0.6rem 0 0 0;
+    line-height: 1.45;
+}
+
+/* ---------- Vincitore: classifica a righe ---------- */
+.cic-rank-list {
     display: flex;
     flex-direction: column;
+    gap: 0.4rem;
+    margin: 0.4rem 0 1rem 0;
+}
+
+.cic-rank-row {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.5rem 0.2rem;
+}
+
+.cic-rank-dot {
+    flex: 0 0 auto;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    background: var(--cic-track);
+    color: var(--cic-text);
+}
+
+.cic-rank-dot.cic-rank-first {
+    background: var(--cic-amber);
+    color: #1a1a1a;
+}
+
+.cic-rank-name {
+    flex: 0 0 30%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--cic-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cic-rank-bar {
     flex: 1;
-    gap: 0.25rem;
-    min-width: 0;
+    height: 8px;
+    background: var(--cic-track);
+    border-radius: 999px;
+    overflow: hidden;
 }
 
-.cic-card-name {
-    font-weight: 500;
-    line-height: 1.3;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
+.cic-rank-bar-fill {
+    height: 100%;
+    background: var(--cic-amber);
+    border-radius: 999px;
 }
 
-.cic-card-score {
-    font-family: 'Cormorant Garamond', Garamond, serif;
-    font-size: 1.15rem;
-    color: var(--cic-amber);
-    font-weight: 500;
-    line-height: 1;
+.cic-rank-score {
+    flex: 0 0 auto;
+    min-width: 3.5rem;
+    text-align: right;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--cic-text);
 }
 
-/* Spinner ambrato centrato con testo italico. Sostituisce st.spinner per
-   le attese più lunghe (LLM, generazione report). */
+/* ---------- Vincitore: tabella breakdown ---------- */
+.cic-breakdown {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0.4rem 0 1rem 0;
+}
+
+.cic-breakdown th {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--cic-text-muted);
+    text-align: left;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid var(--cic-border-strong);
+}
+
+.cic-breakdown td {
+    font-size: 0.85rem;
+    color: var(--cic-text);
+    padding: 0.45rem 0.5rem;
+    border-bottom: 1px solid var(--cic-border);
+}
+
+.cic-breakdown th.cic-num,
+.cic-breakdown td.cic-num {
+    text-align: right;
+}
+
+.cic-breakdown td.cic-contrib {
+    color: var(--cic-amber-dark);
+    font-weight: 700;
+}
+
+/* ---------- Spinner ambrato centrato ---------- */
 @keyframes cic-spin {
     to { transform: rotate(360deg); }
 }
@@ -321,36 +504,37 @@ header[data-testid="stHeader"] {
 
 .cic-spinner-text {
     color: var(--cic-text-muted);
-    font-style: italic;
     text-align: center;
-    font-family: 'Cormorant Garamond', Garamond, serif;
-    font-size: 1.1rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 0.95rem;
     max-width: 32rem;
-    line-height: 1.4;
+    line-height: 1.5;
 }
 
+/* ---------- Banner aggiornamento ---------- */
 .cic-update-banner {
     margin: 0.4rem 0 0.8rem;
     padding: 0.6rem 0.75rem;
-    border: 1px solid var(--cic-amber);
-    border-left-width: 3px;
-    border-radius: 4px;
+    border: 1px solid var(--cic-border-strong);
+    border-left: 3px solid var(--cic-amber);
+    border-radius: 8px;
     background: rgba(232, 184, 75, 0.08);
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .cic-update-title {
-    font-size: 0.78rem;
-    font-weight: 500;
+    font-size: 0.72rem;
+    font-weight: 600;
     color: var(--cic-text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
 }
 
 .cic-update-version {
-    font-family: 'Cormorant Garamond', Garamond, serif;
-    font-size: 1.3rem;
-    color: var(--cic-amber);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--cic-amber-dark);
     line-height: 1.1;
     margin: 0.15rem 0 0.35rem;
 }
@@ -363,5 +547,11 @@ header[data-testid="stHeader"] {
     padding-bottom: 1px;
 }
 .cic-update-link:hover {
-    color: var(--cic-amber);
+    color: var(--cic-amber-dark);
+}
+
+/* Report / corpo: markdown con line-height comodo nell'area principale */
+.stMainBlockContainer [data-testid="stMarkdown"] p,
+.stMainBlockContainer [data-testid="stMarkdown"] li {
+    line-height: 1.6;
 }

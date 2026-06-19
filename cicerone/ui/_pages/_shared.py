@@ -99,6 +99,30 @@ def header_cicerone() -> None:
     )
 
 
+def wizard_header(step: str, sub: str | None = None) -> None:
+    """Breadcrumb di wizard in cima al contenuto: "Passo X di 5 · <fase>" +
+    titolo sans bold + thin progress bar oro (indice fase / 5).
+
+    `sub`: riga secondaria opzionale (es. progress "Criterio i/N" intervista).
+    """
+    fasi_keys = [k for k, _ in FASI]
+    n_tot = len(FASI)
+    idx = fasi_keys.index(step) if step in fasi_keys else 0
+    label = dict(FASI).get(step, step)
+    pct = int(round((idx / n_tot) * 100)) if n_tot else 0
+    sub_html = f'<div class="cic-wizard-sub">{sub}</div>' if sub else ""
+    st.markdown(
+        f'<div class="cic-wizard">'
+        f'<div class="cic-wizard-eyebrow">Passo {idx + 1} di {n_tot}</div>'
+        f'<div class="cic-wizard-title">{label}</div>'
+        f'<div class="cic-wizard-track"><div class="cic-wizard-fill" '
+        f'style="width:{pct}%"></div></div>'
+        f"{sub_html}"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
 @contextmanager
 def spinner_cicerone(message: str):
     """Spinner ambrato centrato + testo italico. Sostituisce st.spinner per
@@ -148,6 +172,6 @@ __all__ = [
     "STYLE_CSS", "SHEET", "TAGLINE", "LIVELLO_PESO", "LIVELLI",
     "ROMANI", "FASI", "CHIAVI_RESET",
     # helper UI
-    "inject_style", "divider_cicerone", "header_cicerone", "spinner_cicerone",
-    "vai_a", "_idx_o_default", "get_criteri",
+    "inject_style", "divider_cicerone", "header_cicerone", "wizard_header",
+    "spinner_cicerone", "vai_a", "_idx_o_default", "get_criteri",
 ]

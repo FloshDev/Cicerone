@@ -66,7 +66,7 @@ def genera_report(assessment_id: int) -> str:
     nome_azienda = contesto.get("nome_azienda") or contesto.get("settore") or "Azienda"
 
     system = f"""Sei un consulente senior di AI Strategy per PMI italiane.
-Devi generare un REPORT FINALE personalizzato di valutazione AI Readiness per
+Devi generare un REPORT FINALE personalizzato di valutazione AI Rediness per
 un'azienda che ha completato un assessment guidato.
 
 Output: SOLO markdown ben formattato, in italiano, professionale ma leggibile.
@@ -75,7 +75,7 @@ generiche, niente disclaimer.
 
 Struttura ESATTA (5 sezioni, niente "Riepilogo punteggi"):
 
-# Report AI Readiness — {nome_azienda}
+# Report AI Rediness — {nome_azienda}
 ## Framework consigliato: {framework_nome}
 
 _(Subito sotto il titolo, in 1 frase italica, anticipa il "perché" della scelta)_

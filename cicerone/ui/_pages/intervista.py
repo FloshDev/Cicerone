@@ -2,15 +2,17 @@
 modello (chiudi / approfondisci / spiega) turno per turno."""
 from __future__ import annotations
 
+import html
+
 import streamlit as st
 
 from cicerone.ui._pages._shared import (
     get_criteri,
-    header_cicerone,
     llm_intervista,
     repo,
     spinner_cicerone,
     vai_a,
+    wizard_header,
 )
 
 # Paracadute (NON target): cap morbido sulle risposte valutabili per criterio.
@@ -33,8 +35,13 @@ def pagina_intervista() -> None:
     contesto = st.session_state.contesto_azienda
     criterio_id = criterio["idCriterio"]
 
-    header_cicerone()
-    st.subheader(f"Criterio {i+1}/{n} — {criterio['nomeCriterio']}")
+    wizard_header(
+        "intervista",
+        sub=(
+            f'<span class="cic-crit-count">Criterio {i+1} di {n}</span>'
+            f'<span class="cic-crit-name">{html.escape(criterio["nomeCriterio"])}</span>'
+        ),
+    )
     with st.expander("Definizione", expanded=False):
         st.write(criterio["definizione"])
 

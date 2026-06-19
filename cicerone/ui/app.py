@@ -21,7 +21,6 @@ from cicerone.ui._pages._shared import (
     CHIAVI_RESET,
     FASI,
     LOGO_PATH,
-    ROMANI,
     get_criteri,
     inject_style,
     set_api_key,
@@ -107,19 +106,19 @@ def sidebar_stepper() -> None:
     step = st.session_state.step
 
     if LOGO_PATH.exists():
-        col_l, col_c, col_r = st.sidebar.columns([1, 2, 1])
+        col_l, col_c, col_r = st.sidebar.columns([1, 1, 1])
         with col_c:
             st.image(str(LOGO_PATH), use_container_width=True)
 
     st.sidebar.markdown(
         '<div class="cic-sidebar-title">Cicerone</div>'
-        '<div class="cic-sidebar-caption">Assessment AI Readiness</div>',
+        '<div class="cic-sidebar-caption">AI Rediness</div>',
         unsafe_allow_html=True,
     )
 
     banner_aggiornamento()
 
-    # Badge stato chiave API
+    # Badge stato chiave API — pill sobria
     stato = st.session_state.api_key_valida
     if stato is True:
         badge = '<span class="cic-badge cic-badge-ok">chiave OK</span>'
@@ -127,9 +126,14 @@ def sidebar_stepper() -> None:
         badge = '<span class="cic-badge cic-badge-ko">chiave non valida</span>'
     else:
         badge = '<span class="cic-badge cic-badge-idle">chiave non verificata</span>'
-    st.sidebar.markdown(f"API key: {badge}", unsafe_allow_html=True)
+    st.sidebar.markdown(
+        f'<div class="cic-apikey-row">'
+        f'<span class="cic-apikey-label">API key</span>{badge}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
-    st.sidebar.markdown('<div class="cic-divider">─── · ───</div>', unsafe_allow_html=True)
+    st.sidebar.divider()
 
     raggiunte = st.session_state.get("fasi_raggiunte", {"onboarding"})
     fasi_keys = [k for k, _ in FASI]
@@ -139,8 +143,11 @@ def sidebar_stepper() -> None:
         # oppure già visitata in passato.
         sbloccata = n <= current_idx or key in raggiunte
         attivo = key == step
-        marker = "●" if attivo else " "
-        button_label = f"{marker}  {ROMANI[n]}   {label}"
+        # Pallino numerato: oro pieno con numero scuro se attivo, grigio
+        # altrimenti. Reso come Unicode circled number nel label del bottone
+        # Streamlit (lo stile vive in CSS).
+        dot = "●" if attivo else "○"
+        button_label = f"{dot}  {n + 1}   {label}"
         if st.sidebar.button(
             button_label,
             key=("nav_attivo" if attivo else f"nav_{key}"),
@@ -154,11 +161,11 @@ def sidebar_stepper() -> None:
         criteri = get_criteri()
         n_crit = len(criteri)
         i = min(st.session_state.idx_criterio, n_crit)
-        st.sidebar.markdown('<div class="cic-divider">─── · ───</div>', unsafe_allow_html=True)
+        st.sidebar.divider()
         st.sidebar.progress(i / n_crit if n_crit else 0, text=f"Criterio {min(i+1, n_crit)}/{n_crit}")
 
-    st.sidebar.markdown('<div class="cic-divider">─── · ───</div>', unsafe_allow_html=True)
-    if st.sidebar.button("Ricomincia", key="sidebar_restart"):
+    st.sidebar.divider()
+    if st.sidebar.button("↺  Ricomincia", key="sidebar_restart", use_container_width=True):
         for k in CHIAVI_RESET:
             st.session_state.pop(k, None)
         st.rerun()

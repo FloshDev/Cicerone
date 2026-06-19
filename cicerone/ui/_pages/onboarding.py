@@ -6,14 +6,13 @@ import streamlit as st
 from cicerone.ui._pages._shared import (
     SHEET,
     _idx_o_default,
-    divider_cicerone,
     get_client,
-    header_cicerone,
     repo,
     salva_contesto,
     set_api_key,
     spinner_cicerone,
     vai_a,
+    wizard_header,
 )
 
 SETTORI = [
@@ -55,7 +54,7 @@ def verifica_chiave(api_key: str) -> tuple[bool, str]:
 
 
 def blocco_api_key() -> None:
-    st.subheader("Configurazione")
+    st.markdown('<div class="cic-card-header">Configurazione</div>', unsafe_allow_html=True)
     api_key = st.text_input(
         "Anthropic API Key",
         type="password",
@@ -64,7 +63,7 @@ def blocco_api_key() -> None:
         help="Necessaria per intervista, diagnostica e report. Non viene salvata su disco.",
     )
 
-    col_btn, col_msg = st.columns([1, 3])
+    col_btn, col_msg = st.columns([1, 3], vertical_alignment="center")
     with col_btn:
         verifica_clicked = st.button("Verifica chiave", type="primary", disabled=not api_key.strip())
 
@@ -97,59 +96,73 @@ def blocco_api_key() -> None:
 
 
 def pagina_onboarding() -> None:
-    header_cicerone()
-    blocco_api_key()
-    divider_cicerone()
+    wizard_header("onboarding")
 
-    st.subheader("Profilo dell'azienda")
-    st.caption("I dati restano locali; servono al modello per adattare l'intervista al tuo contesto.")
+    with st.container(border=True):
+        blocco_api_key()
 
     ctx = st.session_state.contesto_azienda or {}
 
-    with st.form("onboarding"):
-        nome_azienda = st.text_input(
-            "Nome azienda",
-            value=ctx.get("nome_azienda", ""),
-            placeholder="Es. Acme S.r.l.",
-        )
-        settore = st.selectbox(
-            "Settore", SETTORI,
-            index=_idx_o_default(SETTORI, ctx.get("settore"), "Manifatturiero"),
-        )
-        dipendenti = st.selectbox(
-            "Numero di dipendenti", FASCE_DIPENDENTI,
-            index=_idx_o_default(FASCE_DIPENDENTI, ctx.get("fascia_dipendenti"), "10-49"),
-        )
-        nazione = st.selectbox(
-            "Nazione", NAZIONI_EUROPA,
-            index=_idx_o_default(NAZIONI_EUROPA, ctx.get("nazione"), "Italia"),
-        )
-        regione = st.text_input(
-            "Regione / Cantone / Stato — opzionale",
-            value=ctx.get("regione") or "",
-            placeholder="Es. Lombardia, Vaud, Bayern...",
-        )
-        gia_usa_ai = st.radio(
-            "L'azienda utilizza già strumenti AI?",
-            USO_AI_OPZIONI,
-            index=_idx_o_default(USO_AI_OPZIONI, ctx.get("uso_ai_attuale"), "No"),
-        )
-        fatturato = st.selectbox(
-            "Fascia di fatturato annuo", FASCE_FATTURATO,
-            index=_idx_o_default(FASCE_FATTURATO, ctx.get("fascia_fatturato"), "500k - 2M €"),
-        )
-        note = st.text_area(
-            "Note aggiuntive (opzionale)",
-            value=ctx.get("note") or "",
-            placeholder="Es. processo principale, mercato, vincoli...",
-        )
+    with st.container(border=True):
+        st.markdown('<div class="cic-card-header">Profilo dell\'azienda</div>', unsafe_allow_html=True)
+        st.caption("I dati restano locali; servono al modello per adattare l'intervista al tuo contesto.")
 
-        chiave_ok = st.session_state.api_key_valida is True
-        submitted = st.form_submit_button(
-            "Avvia intervista",
-            type="primary",
-            disabled=not chiave_ok,
-        )
+        with st.form("onboarding"):
+            r1_a, r1_b = st.columns(2)
+            with r1_a:
+                nome_azienda = st.text_input(
+                    "Nome azienda",
+                    value=ctx.get("nome_azienda", ""),
+                    placeholder="Es. Acme S.r.l.",
+                )
+            with r1_b:
+                settore = st.selectbox(
+                    "Settore", SETTORI,
+                    index=_idx_o_default(SETTORI, ctx.get("settore"), "Manifatturiero"),
+                )
+
+            r2_a, r2_b = st.columns(2)
+            with r2_a:
+                nazione = st.selectbox(
+                    "Nazione", NAZIONI_EUROPA,
+                    index=_idx_o_default(NAZIONI_EUROPA, ctx.get("nazione"), "Italia"),
+                )
+            with r2_b:
+                regione = st.text_input(
+                    "Regione / Cantone / Stato — opzionale",
+                    value=ctx.get("regione") or "",
+                    placeholder="Es. Lombardia, Vaud, Bayern...",
+                )
+
+            r3_a, r3_b = st.columns(2)
+            with r3_a:
+                dipendenti = st.selectbox(
+                    "Numero di dipendenti", FASCE_DIPENDENTI,
+                    index=_idx_o_default(FASCE_DIPENDENTI, ctx.get("fascia_dipendenti"), "10-49"),
+                )
+            with r3_b:
+                fatturato = st.selectbox(
+                    "Fascia di fatturato annuo", FASCE_FATTURATO,
+                    index=_idx_o_default(FASCE_FATTURATO, ctx.get("fascia_fatturato"), "500k - 2M €"),
+                )
+
+            note = st.text_area(
+                "Note aggiuntive (opzionale)",
+                value=ctx.get("note") or "",
+                placeholder="Es. processo principale, mercato, vincoli...",
+            )
+            gia_usa_ai = st.radio(
+                "L'azienda utilizza già strumenti AI?",
+                USO_AI_OPZIONI,
+                index=_idx_o_default(USO_AI_OPZIONI, ctx.get("uso_ai_attuale"), "No"),
+            )
+
+            chiave_ok = st.session_state.api_key_valida is True
+            submitted = st.form_submit_button(
+                "Avvia intervista",
+                type="primary",
+                disabled=not chiave_ok,
+            )
 
     if not chiave_ok:
         st.info("Verifica prima la API key per abilitare l'avvio dell'intervista.")

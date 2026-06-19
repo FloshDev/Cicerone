@@ -4,19 +4,18 @@ from __future__ import annotations
 import streamlit as st
 
 from cicerone.ui._pages._shared import (
-    header_cicerone,
     llm_diag,
     repo,
     spinner_cicerone,
     vai_a,
+    wizard_header,
 )
 
 
 def pagina_diagnostica() -> None:
     assessment_id = st.session_state.assessment_id
 
-    header_cicerone()
-    st.subheader("Diagnostica guidata")
+    wizard_header("diagnostica")
     st.caption("Rispondi alle domande per personalizzare il report finale.")
 
     storia = repo.storia_diagnostica(assessment_id)

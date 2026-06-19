@@ -5,17 +5,15 @@ import streamlit as st
 
 from cicerone.ui._pages._shared import (
     CHIAVI_RESET,
-    divider_cicerone,
-    header_cicerone,
     llm_report,
     spinner_cicerone,
+    wizard_header,
 )
 
 
 def pagina_report() -> None:
     assessment_id = st.session_state.assessment_id
-    header_cicerone()
-    st.subheader("Report finale")
+    wizard_header("report")
 
     if st.session_state.report_markdown is None:
         with spinner_cicerone(
@@ -26,7 +24,7 @@ def pagina_report() -> None:
     markdown = st.session_state.report_markdown
     st.markdown(markdown)
 
-    divider_cicerone()
+    st.divider()
     col_dl, col_new = st.columns(2)
     with col_dl:
         st.download_button(

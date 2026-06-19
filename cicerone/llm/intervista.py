@@ -24,6 +24,25 @@ LIVELLO_PESO = {
     "Non importante": 0.0,
 }
 
+# Schema structured-outputs per valuta_turno: forza il modello a emettere JSON
+# valido (niente più JSONDecodeError su virgolette/escape sbagliati). Schema
+# piatto e tutto-required (forma più sicura per i structured outputs Anthropic):
+# il modello compila sempre tutti i campi, quelli non pertinenti all'azione
+# scelta sono ignorati a valle.
+_SCHEMA_ESITO = {
+    "type": "object",
+    "properties": {
+        "azione": {"enum": ["chiudi", "approfondisci", "spiega"]},
+        "livello": {"enum": list(LIVELLO_PESO.keys())},
+        "motivazione": {"type": "string"},
+        "ambiguo": {"type": "boolean"},
+        "domanda": {"type": "string"},
+        "spiegazione": {"type": "string"},
+    },
+    "required": ["azione", "livello", "motivazione", "ambiguo", "domanda", "spiegazione"],
+    "additionalProperties": False,
+}
+
 
 def _contesto_str(contesto: dict | None) -> str:
     if not contesto:
@@ -35,7 +54,7 @@ def domanda_per_criterio(criterio: dict, contesto: dict | None) -> str:
     """Genera UNA domanda specifica per indagare l'importanza del criterio
     dal punto di vista dell'azienda. Tarata sul settore/dimensione/contesto.
     """
-    system = """Sei un consulente AI Readiness per PMI italiane.
+    system = """Sei un consulente AI Rediness per PMI italiane.
 Stai conducendo un'intervista strutturata: un criterio alla volta, una domanda
 alla volta. La domanda deve aiutare l'imprenditore a capire QUANTO QUEL
 CRITERIO è importante PER LA SUA SPECIFICA AZIENDA (non in astratto).
@@ -105,7 +124,7 @@ def valuta_turno(criterio: dict, contesto: dict | None,
     """
     livelli = list(LIVELLO_PESO.keys())
 
-    system = f"""Sei Cicerone, consulente AI Readiness per PMI italiane. Stai
+    system = f"""Sei Cicerone, consulente AI Rediness per PMI italiane. Stai
 conducendo un'intervista su UN criterio alla volta per capire QUANTO quel
 criterio è importante PER LA SPECIFICA AZIENDA dell'utente.
 
@@ -162,8 +181,21 @@ Decidi l'azione e ritorna SOLO il JSON."""
         max_tokens=600,
         system=system,
         messages=[{"role": "user", "content": user}],
+        output_config={"format": {"type": "json_schema", "schema": _SCHEMA_ESITO}},
     )
-    parsed = json.loads(_strip_json_fence(resp.content[0].text))
+
+    # Parsing difensivo: structured outputs garantisce JSON valido nel caso
+    # normale, ma refusal/troncamento possono comunque dare output non
+    # conforme. In quel caso degrada in una chiusura best-effort invece di
+    # propagare l'eccezione fino alla UI.
+    raw = resp.content[0].text if resp.content else ""
+    try:
+        parsed = json.loads(_strip_json_fence(raw))
+        if not isinstance(parsed, dict):
+            raise ValueError("output JSON non è un oggetto")
+    except (json.JSONDecodeError, ValueError):
+        parsed = {}
+        forza_chiusura = True
 
     azione = parsed.get("azione")
 

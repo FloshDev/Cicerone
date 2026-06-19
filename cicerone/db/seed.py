@@ -8,7 +8,7 @@ from cicerone.db.connection import get_connection
 ROOT = Path(__file__).parent.parent.parent
 RESOURCES = ROOT / "resources"
 MATRICE_XLSX = RESOURCES / "MatriceDB.xlsx"
-CRITERI_MD = RESOURCES / "Criteri_Readiness_Maturity.md"
+CRITERI_MD = RESOURCES / "Criteri_Rediness_Maturity.md"
 
 SHEET_READINESS = "AI Readiness-Maturity"
 SHEET_NOMI = ["readiness", "implementation"]
