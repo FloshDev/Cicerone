@@ -213,7 +213,7 @@ def next_question(
     testo = complete(
         system=system,
         messages=messages,
-        max_tokens=400,
+        max_tokens=800,
     ).strip()
 
     # 5. Check STOP

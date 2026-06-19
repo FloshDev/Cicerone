@@ -54,7 +54,7 @@ Genera la domanda."""
     testo = complete(
         system=system,
         messages=[{"role": "user", "content": user}],
-        max_tokens=200,
+        max_tokens=600,
     )
     return testo.strip()
 
@@ -156,7 +156,7 @@ Decidi l'azione e ritorna SOLO il JSON."""
     raw = complete(
         system=system,
         messages=[{"role": "user", "content": user}],
-        max_tokens=600,
+        max_tokens=1000,
     ) or ""
 
     # Parsing difensivo: chiediamo JSON valido via prompt, ma refusal/troncamento

@@ -309,9 +309,55 @@ header[data-testid="stHeader"] {
     color: var(--cic-text-muted);
 }
 
-/* Esito verifica chiave sotto il bottone */
-.cic-key-ok { color: var(--cic-success); font-weight: 600; }
-.cic-key-ko { color: var(--cic-error); font-weight: 600; }
+/* Il bottone non deve mai andare a capo (es. "Verifica chiave" su due righe) */
+.stButton > button { white-space: nowrap; }
+
+/* Riga verifica chiave: bottone + chip ATTACCATI sulla stessa riga, centrati in
+   verticale. Il blocco di st.container(key="cic_verify_row") è un flex column →
+   lo forziamo a row con align-items:center (centra a prescindere dall'altezza).
+   Il bottone non si restringe né va a capo. */
+[class*="st-key-cic_verify_row"],
+[class*="st-key-cic_verify_row"] [data-testid="stVerticalBlock"] {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.6rem !important;
+}
+/* Ogni item (bottone e chip) si dimensiona sul proprio contenuto: il bottone
+   non viene strozzato (testo che sborda) né si allarga a tutta la riga. */
+[class*="st-key-cic_verify_row"] [data-testid="stElementContainer"] {
+    flex: 0 0 auto !important;
+    width: auto !important;
+}
+/* Il chip renderizza ~8px sotto il centro del bottone nonostante il flex
+   (offset costante dei wrapper markdown di Streamlit). Lo correggo con transform:
+   non altera il layout, quindi non scatta la ricentratura che annullerebbe un
+   margin. Misurato via DOM: con questo dy=0. */
+[class*="st-key-cic_verify_row"] .cic-key-feedback {
+    transform: translateY(-8px);
+}
+
+/* Esito verifica chiave: chip sobrio accanto al bottone (coerente col resto) */
+.cic-key-feedback {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0.4rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid currentColor;
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.2;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.cic-key-feedback--ok {
+    color: var(--cic-success);
+    background: rgba(75, 232, 122, 0.08);
+}
+.cic-key-feedback--ko {
+    color: var(--cic-error);
+    background: rgba(232, 91, 75, 0.08);
+}
 
 /* ---------- Card micro-header (onboarding) ---------- */
 .cic-card-header {
@@ -485,12 +531,17 @@ header[data-testid="stHeader"] {
 }
 
 .cic-spinner-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 2.4rem 0;
     gap: 1rem;
+    background: rgba(250, 250, 247, 0.78);  /* scrim leggero, match bg #FAFAF7 */
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
 }
 
 .cic-spinner {

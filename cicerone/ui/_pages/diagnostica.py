@@ -5,6 +5,7 @@ import streamlit as st
 
 from cicerone.ui._pages._shared import (
     llm_diag,
+    llm_guard,
     repo,
     spinner_cicerone,
     vai_a,
@@ -27,7 +28,7 @@ def pagina_diagnostica() -> None:
             st.markdown(qa["risposta_utente"])
 
     if st.session_state.diag_domanda_corrente is None:
-        with spinner_cicerone("Sto generando la prossima domanda..."):
+        with llm_guard(), spinner_cicerone("Sto generando la prossima domanda..."):
             st.session_state.diag_domanda_corrente = llm_diag.next_question(assessment_id)
 
     domanda = st.session_state.diag_domanda_corrente
@@ -45,7 +46,7 @@ def pagina_diagnostica() -> None:
     if risposta and risposta.strip():
         with st.chat_message("user"):
             st.markdown(risposta)
-        with spinner_cicerone("Sto interpretando la tua risposta..."):
+        with llm_guard(), spinner_cicerone("Sto interpretando la tua risposta..."):
             prossima = llm_diag.next_question(
                 assessment_id,
                 domanda_precedente=domanda,

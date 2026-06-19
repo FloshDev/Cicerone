@@ -5,6 +5,7 @@ import streamlit as st
 
 from cicerone.ui._pages._shared import (
     SHEET,
+    LLMError,
     _idx_o_default,
     complete,
     repo,
@@ -46,7 +47,9 @@ def verifica_chiave(api_key: str, model: str) -> tuple[bool, str]:
     set_model(model)
     try:
         complete(system="", messages=[{"role": "user", "content": "ping"}], max_tokens=10)
-        return True, "Chiave valida."
+        return True, "Chiave valida"
+    except LLMError as e:
+        return False, str(e)
     except Exception as e:
         return False, f"{type(e).__name__}: {str(e)[:200]}"
 
@@ -63,6 +66,8 @@ def blocco_api_key() -> None:
             "`gemini/gemini-2.0-flash`."
         ),
     )
+    # Campo chiave: type="password" → mascherata a pallini con l'occhio nativo di
+    # Streamlit per rivelarla quando serve.
     api_key = st.text_input(
         "API Key",
         type="password",
@@ -71,9 +76,39 @@ def blocco_api_key() -> None:
         help="Necessaria per intervista, diagnostica e report. Non viene salvata su disco.",
     )
 
-    col_btn, col_msg = st.columns([1, 3], vertical_alignment="center")
-    with col_btn:
-        verifica_clicked = st.button("Verifica chiave", type="primary", disabled=not api_key.strip())
+    # Se chiave/modello cambiano, invalida l'esito precedente (prima di renderizzare
+    # bottone + chip, così il chip riflette lo stato corrente).
+    if api_key and (
+        api_key.strip() != st.session_state.api_key
+        or model.strip() != st.session_state.model
+    ):
+        st.session_state.api_key = api_key.strip()
+        st.session_state.model = model.strip()
+        st.session_state.api_key_valida = None
+        st.session_state.api_key_messaggio = ""
+    if api_key:
+        set_api_key(api_key.strip())
+        set_model(model.strip())
+
+    # Bottone + chip esito ATTACCATI sulla stessa riga, centrati verticalmente.
+    # Contenitore flex (CSS st-key-cic_verify_row): row + align-items center +
+    # gap piccolo; il bottone non si restringe (flex:0 0 auto) né va a capo.
+    with st.container(key="cic_verify_row"):
+        verifica_clicked = st.button(
+            "Verifica chiave", type="primary", disabled=not api_key.strip()
+        )
+        if st.session_state.api_key_valida is True:
+            st.markdown(
+                f'<div class="cic-key-feedback cic-key-feedback--ok">'
+                f'✓ {st.session_state.api_key_messaggio}</div>',
+                unsafe_allow_html=True,
+            )
+        elif st.session_state.api_key_valida is False:
+            st.markdown(
+                f'<div class="cic-key-feedback cic-key-feedback--ko">'
+                f'✗ {st.session_state.api_key_messaggio}</div>',
+                unsafe_allow_html=True,
+            )
 
     if verifica_clicked:
         with spinner_cicerone("Verifico la chiave..."):
@@ -83,28 +118,6 @@ def blocco_api_key() -> None:
         st.session_state.api_key_valida = ok
         st.session_state.api_key_messaggio = msg
         st.rerun()
-    elif api_key and api_key.strip() != st.session_state.api_key:
-        st.session_state.api_key = api_key.strip()
-        st.session_state.model = model.strip()
-        st.session_state.api_key_valida = None
-        st.session_state.api_key_messaggio = ""
-        set_api_key(api_key.strip())
-        set_model(model.strip())
-    elif api_key:
-        set_api_key(api_key.strip())
-        set_model(model.strip())
-
-    with col_msg:
-        if st.session_state.api_key_valida is True:
-            st.markdown(
-                f'<div class="cic-key-ok">✓ {st.session_state.api_key_messaggio}</div>',
-                unsafe_allow_html=True,
-            )
-        elif st.session_state.api_key_valida is False:
-            st.markdown(
-                f'<div class="cic-key-ko">✗ {st.session_state.api_key_messaggio}</div>',
-                unsafe_allow_html=True,
-            )
 
 
 def pagina_onboarding() -> None:

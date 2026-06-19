@@ -7,8 +7,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# I provider che non supportano un parametro lo ignorano invece di sollevare
+# (es. reasoning_effort su modelli non-thinking).
+litellm.drop_params = True
+
 _api_key_override: str | None = None
 _model_override: str | None = None
+
+
+class LLMError(Exception):
+    """Errore di una chiamata al modello, con messaggio già pronto per l'utente
+    (no traceback). Sollevato da complete() mappando le eccezioni litellm."""
 
 
 def set_api_key(api_key: str | None) -> None:
@@ -33,12 +42,53 @@ def get_model() -> str:
 
 def complete(system: str, messages: list, max_tokens: int) -> str:
     """Unico helper applicativo: compone system + messages e chiama litellm.
-    Ritorna il testo della risposta."""
-    composti = [{"role": "system", "content": system}] + messages
-    resp = litellm.completion(
-        model=get_model(),
-        messages=composti,
-        max_tokens=max_tokens,
-        api_key=_api_key_override or None,
-    )
+    Ritorna il testo della risposta.
+
+    Sui modelli con thinking attivo di default (Gemini 2.5) passiamo
+    `reasoning_effort="disable"`: senza, i token di ragionamento consumano il
+    budget `max_tokens` e troncano la risposta. NON lo passiamo ad altri
+    provider (es. Anthropic) perché il loro default è già senza thinking e il
+    parametro genererebbe una richiesta malformata (BadRequest)."""
+    model = get_model()
+    composti = []
+    if system and system.strip():
+        composti.append({"role": "system", "content": system})
+    composti += messages
+
+    extra: dict = {}
+    if "gemini" in model.lower():
+        extra["reasoning_effort"] = "disable"
+
+    try:
+        resp = litellm.completion(
+            model=model,
+            messages=composti,
+            max_tokens=max_tokens,
+            api_key=_api_key_override or None,
+            **extra,
+        )
+    except litellm.RateLimitError as e:
+        raise LLMError(
+            "Limite di richieste del provider raggiunto (rate limit / quota). "
+            "Attendi qualche secondo e riprova. Se usi un piano free, potresti "
+            "aver esaurito la quota giornaliera del modello."
+        ) from e
+    except litellm.AuthenticationError as e:
+        raise LLMError(
+            "Chiave API non valida o non autorizzata per questo modello."
+        ) from e
+    except litellm.NotFoundError as e:
+        raise LLMError(
+            "Modello non trovato: controlla la stringa modello (es. "
+            "gemini/gemini-2.5-flash, openai/gpt-4o)."
+        ) from e
+    except litellm.BadRequestError as e:
+        raise LLMError(
+            "Richiesta non valida per questo modello: controlla la stringa "
+            "modello e che la chiave corrisponda al provider."
+        ) from e
+    except Exception as e:
+        raise LLMError(
+            f"Errore nella chiamata al modello: {type(e).__name__}."
+        ) from e
     return resp.choices[0].message.content

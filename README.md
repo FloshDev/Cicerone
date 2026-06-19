@@ -66,22 +66,43 @@ SQLite viene applicato e il database viene popolato (seed dei criteri, degli
 11 framework e dei voti MCDA). Il database locale persiste in
 `cicerone/data/cicerone.sqlite` (gitignored).
 
-### API key e modello
+### Configurazione del modello e della API key
 
-Serve una API key per le chiamate ai modelli. Il modello è configurabile: di
-default è `anthropic/claude-sonnet-4-6`, ma puoi indicare qualsiasi stringa
-modello supportata da litellm (es. `openai/gpt-4o`, `gemini/gemini-2.0-flash`).
-Lo stesso modello viene usato per intervista, diagnostica e report.
+Cicerone è **provider-agnostico**: le chiamate passano per
+[litellm](https://docs.litellm.ai/), quindi puoi usare il modello che preferisci
+(Anthropic, OpenAI, Google Gemini, ecc.). Lo **stesso modello** viene usato per
+intervista, diagnostica e report.
 
-- **UI (onboarding):** indica la stringa modello e incolla la chiave del
-  relativo provider nei campi dedicati. Valgono per la sessione corrente e non
-  vengono mai persistite su disco.
-- **`.env` (sviluppo):** copia `.env.example` in `.env` e inserisci la chiave
-  del provider (litellm legge le env var standard, es. `ANTHROPIC_API_KEY`,
-  `OPENAI_API_KEY`). Override del modello via `CICERONE_MODEL`. `.env` è
-  gitignored.
+**La stringa modello** è nel formato litellm `provider/nome-modello`:
 
-Se presenti, i valori inseriti dalla UI hanno precedenza.
+| Provider           | Esempio di stringa modello       | API key (provider)   |
+|--------------------|----------------------------------|----------------------|
+| Anthropic (Claude) | `anthropic/claude-sonnet-4-6`    | Anthropic Console    |
+| OpenAI             | `openai/gpt-4o`                  | OpenAI Platform      |
+| Google Gemini      | `gemini/gemini-2.5-flash`        | Google AI Studio     |
+
+Il prefisso (`anthropic/`, `openai/`, `gemini/`, …) indica il provider; dopo lo
+slash va il nome del modello come lo trovi nella console del provider. Elenco
+completo per provider: <https://docs.litellm.ai/docs/providers>. Se non imposti
+nulla, il default è **`anthropic/claude-sonnet-4-6`**.
+
+> ℹ️ La chiave deve corrispondere al provider della stringa modello: una chiave
+> Google funziona solo con un modello `gemini/...`, una chiave Anthropic solo con
+> `anthropic/...`, ecc.
+
+Due modi per configurare (i valori della UI hanno precedenza):
+
+- **UI (onboarding):** scrivi la stringa modello nel campo **Modello** e incolla
+  la chiave nel campo **API Key**. Valgono per la sessione corrente, non vengono
+  mai salvate su disco.
+- **`.env` (sviluppo):** copia `.env.example` in `.env`. Imposta la chiave del
+  provider (litellm legge le env var standard: `ANTHROPIC_API_KEY`,
+  `OPENAI_API_KEY`, `GEMINI_API_KEY`, …) e, opzionalmente, il modello con
+  `CICERONE_MODEL`. `.env` è gitignored.
+
+> ⚠️ Attenzione ai limiti del provider: i piani gratuiti (es. Gemini free tier,
+> ~20 richieste/giorno) si esauriscono in fretta durante un assessment completo;
+> l'app mostra un messaggio chiaro in caso di rate limit.
 
 ## Quickstart (desktop)
 

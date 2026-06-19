@@ -21,7 +21,6 @@ from cicerone.ui._pages._shared import (
     CHIAVI_RESET,
     FASI,
     LOGO_PATH,
-    get_criteri,
     inject_style,
     set_api_key,
     set_model,
@@ -158,13 +157,6 @@ def sidebar_stepper() -> None:
         ):
             st.session_state.step = key
             st.rerun()
-
-    if step == "intervista":
-        criteri = get_criteri()
-        n_crit = len(criteri)
-        i = min(st.session_state.idx_criterio, n_crit)
-        st.sidebar.divider()
-        st.sidebar.progress(i / n_crit if n_crit else 0, text=f"Criterio {min(i+1, n_crit)}/{n_crit}")
 
     st.sidebar.divider()
     if st.sidebar.button("↺  Ricomincia", key="sidebar_restart", use_container_width=True):

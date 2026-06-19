@@ -8,6 +8,7 @@ import streamlit as st
 
 from cicerone.ui._pages._shared import (
     get_criteri,
+    llm_guard,
     llm_intervista,
     repo,
     spinner_cicerone,
@@ -55,7 +56,7 @@ def pagina_intervista() -> None:
     # Genera domanda iniziale quando entri nel criterio per la prima volta
     if st.session_state.intervista_idx_corrente != i or st.session_state.intervista_domanda_corrente is None:
         if not history:
-            with spinner_cicerone("Sto formulando la domanda adatta al tuo contesto..."):
+            with llm_guard(), spinner_cicerone("Sto formulando la domanda adatta al tuo contesto..."):
                 domanda_iniziale = llm_intervista.domanda_per_criterio(criterio, contesto)
             history.append({"role": "assistant", "content": domanda_iniziale, "kind": "domanda"})
             st.session_state.intervista_domanda_corrente = domanda_iniziale
@@ -113,7 +114,7 @@ def pagina_intervista() -> None:
             or n_turni >= HARD_CEILING_TURNI
         )
 
-        with spinner_cicerone("Sto interpretando la tua risposta..."):
+        with llm_guard(), spinner_cicerone("Sto interpretando la tua risposta..."):
             esito = llm_intervista.valuta_turno(
                 criterio, contesto, history, n_valutate, forza_chiusura=forza
             )

@@ -40,7 +40,7 @@ from cicerone.db import repository as repo  # noqa: E402  (import dopo bootstrap
 from cicerone.llm import diagnostica as llm_diag  # noqa: E402
 from cicerone.llm import intervista as llm_intervista  # noqa: E402
 from cicerone.llm import report as llm_report  # noqa: E402
-from cicerone.llm._client import complete, set_api_key, set_model  # noqa: E402
+from cicerone.llm._client import LLMError, complete, set_api_key, set_model  # noqa: E402
 from cicerone.mcda import calcolo as mcda  # noqa: E402
 
 salva_contesto = repo.salva_contesto
@@ -141,6 +141,19 @@ def spinner_cicerone(message: str):
         placeholder.empty()
 
 
+@contextmanager
+def llm_guard():
+    """Cattura gli errori del modello (rate limit, auth, modello errato, ecc.)
+    e mostra un messaggio pulito invece del traceback, fermando lo script run.
+    Usare attorno alle chiamate LLM nelle pagine: `with llm_guard(),
+    spinner_cicerone(...):`."""
+    try:
+        yield
+    except LLMError as e:
+        st.error(str(e))
+        st.stop()
+
+
 def vai_a(nuovo_step: str) -> None:
     """Cambia step e registra come raggiunto. Poi rerun."""
     raggiunte = st.session_state.setdefault("fasi_raggiunte", {"onboarding"})
@@ -167,11 +180,11 @@ def get_criteri() -> list[dict]:
 __all__ = [
     # moduli/oggetti pesanti (re-export)
     "repo", "mcda", "llm_diag", "llm_intervista", "llm_report",
-    "complete", "set_api_key", "set_model", "salva_contesto",
+    "complete", "set_api_key", "set_model", "LLMError", "salva_contesto",
     # costanti
     "STYLE_CSS", "SHEET", "TAGLINE", "LIVELLO_PESO", "LIVELLI",
     "ROMANI", "FASI", "CHIAVI_RESET",
     # helper UI
     "inject_style", "divider_cicerone", "header_cicerone", "wizard_header",
-    "spinner_cicerone", "vai_a", "_idx_o_default", "get_criteri",
+    "spinner_cicerone", "llm_guard", "vai_a", "_idx_o_default", "get_criteri",
 ]

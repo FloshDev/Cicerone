@@ -5,6 +5,7 @@ import streamlit as st
 
 from cicerone.ui._pages._shared import (
     CHIAVI_RESET,
+    llm_guard,
     llm_report,
     spinner_cicerone,
     wizard_header,
@@ -16,7 +17,7 @@ def pagina_report() -> None:
     wizard_header("report")
 
     if st.session_state.report_markdown is None:
-        with spinner_cicerone(
+        with llm_guard(), spinner_cicerone(
             "Sto preparando il report finale, possono volerci 20-30 secondi..."
         ):
             st.session_state.report_markdown = llm_report.genera_report(assessment_id)

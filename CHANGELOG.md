@@ -35,6 +35,25 @@ progetto aderisce al [Versionamento Semantico](https://semver.org/lang/it/).
 
 - **Crash al parsing JSON dell'intervista**: risposte del modello non
   serializzabili facevano crashare lo step; parsing reso robusto.
+- **Troncamento risposte sui modelli con thinking** (es. Gemini 2.5 Flash): i
+  token di ragionamento consumavano `max_tokens` troncando le domande. Ora
+  `complete()` passa `reasoning_effort="disable"` ai soli modelli Gemini e i cap
+  `max_tokens` sono più ampi.
+- **BadRequest su Anthropic**: `reasoning_effort` e system vuoto facevano fallire
+  Claude. Il parametro thinking è ora limitato a Gemini e il messaggio system
+  vuoto non viene più inviato.
+- **Crash su errori del provider** (rate limit, chiave errata, modello
+  inesistente): `complete()` mappa le eccezioni litellm in `LLMError` con
+  messaggio in italiano e le pagine le mostrano con `llm_guard()` come errore
+  pulito, senza traceback.
+- **UI onboarding**: chip "Chiave valida/non valida" accanto al bottone e
+  centrato; bottone che non va a capo né strozza il testo; campo API key
+  mascherato con occhio per rivelarla.
+
+### Changed (UI)
+
+- Sidebar: rimosso il contatore "Criterio X/N" durante l'intervista (le fasi in
+  alto bastano).
 
 ### Docs
 
