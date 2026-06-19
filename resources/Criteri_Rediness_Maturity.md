@@ -1,8 +1,8 @@
-# Criteri Readiness Maturity
+# Criteri Rediness Maturity
 
 ## 1. Completezza dimensionale
 
-Analizza quante e quali dimensioni rilevanti della AI readiness sono coperte dal framework e, soprattutto, quanto siano bilanciate. Verifica che il modello non si concentri unicamente su aspetti tecnologici, ma includa in modo equilibrato componenti strategiche, organizzative, umane, etico-legali e di competenze, restituendo così una fotografia sistemica e non solo verticale su una singola funzione aziendale.
+Analizza quante e quali dimensioni rilevanti della AI rediness sono coperte dal framework e, soprattutto, quanto siano bilanciate. Verifica che il modello non si concentri unicamente su aspetti tecnologici, ma includa in modo equilibrato componenti strategiche, organizzative, umane, etico-legali e di competenze, restituendo così una fotografia sistemica e non solo verticale su una singola funzione aziendale.
 
 ## 2. Capacità di guidare l'azione
 
@@ -23,7 +23,7 @@ La posta in gioco è sostanziale: il “vero valore” di una PMI manifatturiera
 
 ## 5. Granularità e profondità di analisi
 
-Esamina la capacità del framework di articolare le dimensioni di readiness su più livelli di dettaglio, scendendo da categorie astratte di alto livello fino a sottodimensioni operative e indicatori concreti. Misura quanto l’analisi sia in grado di “andare in profondità” per cogliere sfumature, anziché arrestarsi a una valutazione generica.
+Esamina la capacità del framework di articolare le dimensioni di rediness su più livelli di dettaglio, scendendo da categorie astratte di alto livello fino a sottodimensioni operative e indicatori concreti. Misura quanto l’analisi sia in grado di “andare in profondità” per cogliere sfumature, anziché arrestarsi a una valutazione generica.
 
 ## 6. Facilità d’uso
 
@@ -35,7 +35,7 @@ Questo criterio valuta la flessibilità di esecuzione del framework. Misura se l
 
 ## 8. Orientamento al valore di business
 
-Analizza se il framework parte dall’identificazione dei processi core e della value proposition dell’impresa, focalizzando l’assessment di readiness proprio su dove l’AI può generare il maggiore impatto competitivo. Misura la presenza di una fase di mappatura della "value chain", volta a stabilire dove l'azienda crea realmente valore per i propri clienti.
+Analizza se il framework parte dall’identificazione dei processi core e della value proposition dell’impresa, focalizzando l’assessment di rediness proprio su dove l’AI può generare il maggiore impatto competitivo. Misura la presenza di una fase di mappatura della "value chain", volta a stabilire dove l'azienda crea realmente valore per i propri clienti.
 
 Serve ad assicurare che l'adozione dell'AI venga indirizzata verso i processi "core" per un reale miglioramento della competitività, evitando di certificare una maturità fine a sé stessa su attività marginali.
 

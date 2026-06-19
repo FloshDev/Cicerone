@@ -23,7 +23,7 @@ def classifica_framework(assessment_id: int) -> list[dict]:
                    ON pa.criterio_id = v.criterio_id
                   AND pa.assessment_id = ?
             JOIN Sheet s ON f.sheet_id = s.idSheet
-            WHERE s.nome = 'readiness'
+            WHERE s.nome = 'rediness'
             GROUP BY f.idFramework, f.nomeFramework
             ORDER BY punteggio DESC, f.idFramework
             """,
@@ -48,7 +48,7 @@ def breakdown_per_criterio(assessment_id: int, framework_id: int) -> list[dict]:
                    ON pa.criterio_id = c.idCriterio
                   AND pa.assessment_id = ?
             JOIN Sheet s ON c.sheet_id = s.idSheet
-            WHERE s.nome = 'readiness'
+            WHERE s.nome = 'rediness'
             ORDER BY c.idCriterio
             """,
             (framework_id, assessment_id),

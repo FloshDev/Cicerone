@@ -2,13 +2,21 @@
 
 > La voce che orienta la tua PMI nell'adozione dell'AI.
 
-> ⚠️ **Progetto in sviluppo attivo.** La release `v0.1.0` copre l'intero flusso
-> di **AI Rediness** (intervista, MCDA, diagnostica, report) sullo sheet
-> `readiness`. La parte dedicata all'**AI Implementation** — secondo sheet di
-> framework, percorso parallelo per aziende già pronte che vogliono passare
-> all'adozione effettiva — è pianificata per le release successive. Interfaccia
-> e logica MCDA sono già predisposte; mancano i contenuti della knowledge base
-> e i prompt LLM specifici.
+> ⚠️ **Demo / prototipo in sviluppo attivo.** L'app attuale (`v0.1.3`) è una
+> **demo funzionante** costruita rapidamente in stile *vibe coding*: serve a
+> dimostrare il flusso end-to-end, non è codice di produzione consolidato. È
+> in corso una **riscrittura da zero dell'interfaccia in [Flet](https://flet.dev/)**
+> (cartella isolata `flet_ui/`, vedi [`flet_ui/BRIEF-FLET-UI.md`](flet_ui/BRIEF-FLET-UI.md)),
+> che sostituirà l'attuale UI Streamlit lasciando il backend (DB, MCDA, LLM)
+> intatto. Aspettarsi quindi UI e dettagli soggetti a cambiamenti.
+>
+> **Copertura attuale:** la demo copre l'intero flusso di **AI Rediness**
+> (intervista, MCDA, diagnostica, report) sullo sheet `rediness`. La parte
+> dedicata all'**AI Implementation** — secondo sheet di framework, percorso
+> parallelo per aziende già pronte che vogliono passare all'adozione effettiva
+> — verrà rilasciata in una **seconda fase**. Interfaccia e logica MCDA sono
+> già predisposte; mancano i contenuti della knowledge base e i prompt LLM
+> specifici.
 
 Cicerone è un agente AI conversazionale che aiuta le PMI europee a valutare
 la propria AI Rediness/Maturity scegliendo, fra 11 framework accademici, quello
@@ -77,10 +85,11 @@ cicerone/                  # package Python
 ├── db/                    # connessione, schema SQL, seed, repository
 ├── llm/                   # intervista, diagnostica, report, client Anthropic
 ├── mcda/                  # calcolo MCDA (classifica framework)
-├── ui/                    # interfaccia Streamlit (app + pages + style.css)
+├── ui/                    # interfaccia Streamlit attuale (app + _pages + style.css)
 ├── desktop/               # launcher desktop (launcher, paths, setup knowledge)
 └── data/                  # database SQLite a runtime (gitignored)
 
+flet_ui/                   # riscrittura UI in Flet (lavoro isolato, work in progress)
 packaging/                 # build .app/.dmg (PyInstaller + pywebview)
 resources/                 # asset statici consumati dal seed
 ├── Criteri_Rediness_Maturity.md  # definizioni dei criteri
@@ -107,8 +116,8 @@ Per i dettagli su moduli, flusso dati e design system vedi
   raccolti, framework vincitore, diagnostica.
 - **Framework** — uno degli 11 modelli accademici di AI Rediness/Maturity tra
   cui Cicerone sceglie il più adatto.
-- **Sheet** — categoria che raggruppa criteri e framework (`readiness` /
-  `implementation`); il flusso utente lavora sullo sheet `readiness`.
+- **Sheet** — categoria che raggruppa criteri e framework (`rediness` /
+  `implementation`); il flusso utente lavora sullo sheet `rediness`.
 - **Diagnostica** — fase conversazionale multi-turno, successiva al calcolo
   MCDA, in cui l'LLM approfondisce i gap dell'azienda rispetto al framework
   vincitore prima di generare il report.

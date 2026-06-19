@@ -8,8 +8,8 @@ dati e le scelte di configurazione e design di Cicerone. Per setup e uso vedi
 
 Lo schema SQLite (`cicerone/db/schema.sql`) è costruito attorno a sette tabelle:
 
-- **Sheet** — categoria che raggruppa criteri e framework (`readiness` /
-  `implementation`). Il flusso utente lavora sullo sheet `readiness`.
+- **Sheet** — categoria che raggruppa criteri e framework (`rediness` /
+  `implementation`). Il flusso utente lavora sullo sheet `rediness`.
 - **Criterio** — dimensione di valutazione (nome, definizione, sheet).
 - **Framework** — uno degli 11 modelli accademici (nome, sheet).
 - **Voto** — quanto un framework copre un criterio. Chiave composta

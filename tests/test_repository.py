@@ -2,9 +2,9 @@
 from cicerone.db import repository
 
 
-def test_lista_criteri_readiness():
-    criteri = repository.lista_criteri("readiness")
-    # Il seed inserisce esattamente N_CRITERI = 10 criteri per 'readiness'.
+def test_lista_criteri_rediness():
+    criteri = repository.lista_criteri("rediness")
+    # Il seed inserisce esattamente N_CRITERI = 10 criteri per 'rediness'.
     assert len(criteri) == 10
     primo = criteri[0]
     assert set(primo.keys()) == {"idCriterio", "nomeCriterio", "definizione"}
@@ -18,8 +18,8 @@ def test_lista_criteri_sheet_inesistente_vuoto():
     assert repository.lista_criteri("non_esiste") == []
 
 
-def test_lista_framework_readiness():
-    framework = repository.lista_framework("readiness")
+def test_lista_framework_rediness():
+    framework = repository.lista_framework("rediness")
     assert len(framework) > 0
     primo = framework[0]
     assert set(primo.keys()) == {"idFramework", "nomeFramework", "pdf_path"}
@@ -28,13 +28,13 @@ def test_lista_framework_readiness():
 
 
 def test_crea_assessment_ritorna_id_crescente():
-    a1 = repository.crea_assessment("readiness")
-    a2 = repository.crea_assessment("readiness")
+    a1 = repository.crea_assessment("rediness")
+    a2 = repository.crea_assessment("rediness")
     assert isinstance(a1, int)
     assert a2 > a1
     rec = repository.get_assessment(a1)
     assert rec is not None
-    assert rec["sheet_nome"] == "readiness"
+    assert rec["sheet_nome"] == "rediness"
 
 
 def test_crea_assessment_sheet_inesistente_solleva():
@@ -45,7 +45,7 @@ def test_crea_assessment_sheet_inesistente_solleva():
 
 
 def test_salva_peso_inserisce(assessment_id):
-    criterio = repository.lista_criteri("readiness")[0]
+    criterio = repository.lista_criteri("rediness")[0]
     repository.salva_peso(
         assessment_id,
         criterio["idCriterio"],
@@ -69,7 +69,7 @@ def test_salva_peso_inserisce(assessment_id):
 def test_salva_peso_upsert_sovrascrive(assessment_id):
     """La seconda salva_peso sullo stesso (assessment, criterio) deve fare
     UPDATE (UPSERT), non creare una seconda riga."""
-    criterio = repository.lista_criteri("readiness")[0]
+    criterio = repository.lista_criteri("rediness")[0]
     cid = criterio["idCriterio"]
 
     repository.salva_peso(
@@ -93,9 +93,9 @@ def test_salva_peso_upsert_sovrascrive(assessment_id):
 
 def test_salva_peso_isolato_per_assessment():
     """Pesi di assessment diversi non si mescolano."""
-    a1 = repository.crea_assessment("readiness")
-    a2 = repository.crea_assessment("readiness")
-    criteri = repository.lista_criteri("readiness")
+    a1 = repository.crea_assessment("rediness")
+    a2 = repository.crea_assessment("rediness")
+    criteri = repository.lista_criteri("rediness")
     repository.salva_peso(a1, criteri[0]["idCriterio"], "Importante", 7.5)
     repository.salva_peso(a2, criteri[1]["idCriterio"], "Fondamentale", 10.0)
 

@@ -10,8 +10,8 @@ RESOURCES = ROOT / "resources"
 MATRICE_XLSX = RESOURCES / "MatriceDB.xlsx"
 CRITERI_MD = RESOURCES / "Criteri_Rediness_Maturity.md"
 
-SHEET_READINESS = "AI Readiness-Maturity"
-SHEET_NOMI = ["readiness", "implementation"]
+SHEET_REDINESS = "AI Rediness-Maturity"
+SHEET_NOMI = ["rediness", "implementation"]
 
 RIGA_HEADER = 5
 COL_NUM_CRITERIO = 1
@@ -46,11 +46,11 @@ def run_if_needed() -> None:
         if not _is_vuoto(conn):
             return
         _seed_sheet(conn)
-        sheet_id_readiness = conn.execute(
-            "SELECT idSheet FROM Sheet WHERE nome = 'readiness'"
+        sheet_id_rediness = conn.execute(
+            "SELECT idSheet FROM Sheet WHERE nome = 'rediness'"
         ).fetchone()[0]
-        _seed_criteri(conn, sheet_id_readiness)
-        _seed_framework_e_voti(conn, sheet_id_readiness)
+        _seed_criteri(conn, sheet_id_rediness)
+        _seed_framework_e_voti(conn, sheet_id_rediness)
         conn.commit()
 
 
@@ -75,7 +75,7 @@ def _seed_criteri(conn, sheet_id: int) -> None:
 
 def _seed_framework_e_voti(conn, sheet_id: int) -> None:
     wb = load_workbook(MATRICE_XLSX, data_only=True)
-    ws = wb[SHEET_READINESS]
+    ws = wb[SHEET_REDINESS]
 
     nomi_framework: list[tuple[int, str]] = []
     for col in range(COL_PRIMO_FRAMEWORK, ws.max_column + 1):

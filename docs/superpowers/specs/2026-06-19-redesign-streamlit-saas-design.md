@@ -41,7 +41,7 @@ successo `#2ea043`. Tema base resta `light`.
 ### 3.1 Shell — opzione A "sidebar ridisegnata"
 Si tiene la sidebar a sinistra (cambio minimo, rischio basso) ma ripulita:
 
-- Logo più piccolo + wordmark "Cicerone" serif + caption "AI Readiness" (sans, uppercase, muted).
+- Logo più piccolo + wordmark "Cicerone" serif + caption "AI Rediness" (sans, uppercase, muted).
 - Badge stato chiave API come pill sobria.
 - **Stepper a pallini numerati**: ogni fase è una riga `[n] Etichetta`. Il numero è un
   cerchietto: pieno oro col numero scuro se è la fase attiva, grigio (`#ece8dd`) se non attiva.

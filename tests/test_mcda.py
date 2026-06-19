@@ -12,8 +12,8 @@ from cicerone.mcda import calcolo
 
 
 def _pesa_tutti(assessment_id, peso=10.0, livello="Fondamentale"):
-    """Assegna lo stesso peso a tutti i criteri readiness."""
-    for c in repository.lista_criteri("readiness"):
+    """Assegna lo stesso peso a tutti i criteri rediness."""
+    for c in repository.lista_criteri("rediness"):
         repository.salva_peso(assessment_id, c["idCriterio"], livello, peso)
 
 
@@ -21,7 +21,7 @@ def test_classifica_ordinata_desc(assessment_id):
     _pesa_tutti(assessment_id, peso=10.0)
     classifica = calcolo.classifica_framework(assessment_id)
 
-    assert len(classifica) == len(repository.lista_framework("readiness"))
+    assert len(classifica) == len(repository.lista_framework("rediness"))
     for r in classifica:
         assert set(r.keys()) == {"framework_id", "nome", "punteggio"}
 
@@ -35,7 +35,7 @@ def test_classifica_ordinata_desc(assessment_id):
 def test_classifica_senza_pesi_tutti_zero(assessment_id):
     """Nessun peso salvato -> COALESCE/LEFT JOIN -> punteggi 0, ma righe presenti."""
     classifica = calcolo.classifica_framework(assessment_id)
-    assert len(classifica) == len(repository.lista_framework("readiness"))
+    assert len(classifica) == len(repository.lista_framework("rediness"))
     assert all(r["punteggio"] == 0 for r in classifica)
 
 
@@ -59,7 +59,7 @@ def test_breakdown_coerente_con_classifica(assessment_id):
 
 def test_breakdown_peso_mancante_e_none(assessment_id):
     """Se non ci sono pesi, peso e contributo sono None (LEFT JOIN)."""
-    framework = repository.lista_framework("readiness")[0]
+    framework = repository.lista_framework("rediness")[0]
     breakdown = calcolo.breakdown_per_criterio(assessment_id, framework["idFramework"])
     assert len(breakdown) > 0
     for riga in breakdown:
