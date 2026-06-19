@@ -9,6 +9,7 @@ ROOT = Path(__file__).parent.parent.parent
 RESOURCES = ROOT / "resources"
 MATRICE_XLSX = RESOURCES / "MatriceDB.xlsx"
 CRITERI_MD = RESOURCES / "Criteri_Readiness_Maturity.md"
+SCHEMA_SQL = Path(__file__).parent / "schema.sql"
 
 SHEET_READINESS = "AI Readiness-Maturity"
 SHEET_NOMI = ["readiness", "implementation"]
@@ -41,17 +42,55 @@ def _is_vuoto(conn) -> bool:
     return n == 0
 
 
+def _ha_sheet_atteso(conn) -> bool:
+    """True se il DB contiene lo sheet 'readiness' atteso dal codice corrente.
+    Un DB seedato da una versione con nome sheet diverso (es. 'rediness') ne è
+    privo → va ricostruito."""
+    return conn.execute(
+        "SELECT 1 FROM Sheet WHERE nome = 'readiness'"
+    ).fetchone() is not None
+
+
+def _reset_db(conn) -> None:
+    """Ricrea il DB da zero: droppa tutte le tabelle e riapplica lo schema.
+    Usato quando il DB persistente è di una versione incompatibile (perdita dei
+    dati assessment pregressi accettabile: i dati di seed sono deterministici e
+    la coerenza dello schema ha priorità)."""
+    conn.execute("PRAGMA foreign_keys = OFF")
+    tabelle = [
+        r[0]
+        for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+    ]
+    for t in tabelle:
+        conn.execute(f'DROP TABLE IF EXISTS "{t}"')
+    conn.executescript(SCHEMA_SQL.read_text(encoding="utf-8"))
+    conn.execute("PRAGMA foreign_keys = ON")
+
+
+def _seed_tutto(conn) -> None:
+    _seed_sheet(conn)
+    sheet_id_readiness = conn.execute(
+        "SELECT idSheet FROM Sheet WHERE nome = 'readiness'"
+    ).fetchone()[0]
+    _seed_criteri(conn, sheet_id_readiness)
+    _seed_framework_e_voti(conn, sheet_id_readiness)
+
+
 def run_if_needed() -> None:
     with get_connection() as conn:
-        if not _is_vuoto(conn):
+        if _is_vuoto(conn):
+            _seed_tutto(conn)
+            conn.commit()
             return
-        _seed_sheet(conn)
-        sheet_id_readiness = conn.execute(
-            "SELECT idSheet FROM Sheet WHERE nome = 'readiness'"
-        ).fetchone()[0]
-        _seed_criteri(conn, sheet_id_readiness)
-        _seed_framework_e_voti(conn, sheet_id_readiness)
-        conn.commit()
+        # DB già popolato: se manca lo sheet atteso è di una versione
+        # incompatibile → ricostruzione + re-seed.
+        if not _ha_sheet_atteso(conn):
+            _reset_db(conn)
+            _seed_tutto(conn)
+            conn.commit()
 
 
 def _seed_sheet(conn) -> None:

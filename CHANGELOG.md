@@ -13,6 +13,11 @@ progetto aderisce al [Versionamento Semantico](https://semver.org/lang/it/).
   risorse): annullato il refuso "Rediness" introdotto in 0.2.0. Rinominati lo
   sheet DB (`readiness`), il foglio Excel (`AI Readiness-Maturity`) e il file
   `resources/Criteri_Readiness_Maturity.md`.
+- **DB auto-riparante**: un database persistente di una versione incompatibile
+  (es. con sheet `rediness`) causava `ValueError: Sheet '...' non trovato`
+  all'avvio dell'intervista. Ora `seed.run_if_needed()` rileva l'assenza dello
+  sheet atteso e ricostruisce il DB ri-seedandolo.
+- Nuovo logo (`resources/branding/logo.png`) full-bleed e `icon.icns` rigenerato.
 
 ## [0.2.0] - 2026-06-19
 
