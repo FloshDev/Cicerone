@@ -9,6 +9,7 @@
 from pathlib import Path
 
 from PyInstaller.utils.hooks import (
+    collect_all,
     collect_data_files,
     collect_submodules,
     copy_metadata,
@@ -38,19 +39,36 @@ datas = [
 
 # Asset statici di Streamlit (frontend React, CSS, file di config).
 datas += collect_data_files("streamlit")
-# Certificati SSL (anthropic via httpx).
+# Certificati SSL (litellm via httpx).
 datas += collect_data_files("certifi")
-# Hook contrib di pyinstaller per moduli con dati extra.
-datas += collect_data_files("anthropic")
 
 # Package metadata: streamlit usa `importlib.metadata.version("streamlit")`
 # all'import. Senza i .dist-info corrispondenti dentro il bundle, l'import
 # crasha con PackageNotFoundError. copy_metadata trasporta i .dist-info.
 datas += copy_metadata("streamlit")
-datas += copy_metadata("anthropic")
 datas += copy_metadata("httpx")
 datas += copy_metadata("openpyxl")
 datas += copy_metadata("python-dotenv")
+
+# litellm + dipendenze pesanti (tiktoken/openai/tokenizers): hanno data file
+# (es. model_prices, encodings) e molti import lazy. collect_all prende
+# datas+binaries+hiddenimports in un colpo. litellm legge anche la propria
+# versione via importlib.metadata → serve copy_metadata.
+binaries = []
+collected_hidden = []
+for _pkg in ("litellm", "tiktoken", "tiktoken_ext", "openai", "tokenizers"):
+    try:
+        _d, _b, _h = collect_all(_pkg)
+        datas += _d
+        binaries += _b
+        collected_hidden += _h
+    except Exception:
+        pass
+for _meta in ("litellm", "openai", "tiktoken"):
+    try:
+        datas += copy_metadata(_meta)
+    except Exception:
+        pass
 
 
 # ----------------------------------------------------------------------------
@@ -82,10 +100,11 @@ def _walk_cicerone_modules():
 
 hiddenimports += _walk_cicerone_modules()
 hiddenimports += collect_submodules("streamlit")
-hiddenimports += collect_submodules("anthropic")
 hiddenimports += collect_submodules("httpx")
 hiddenimports += collect_submodules("httpcore")
 hiddenimports += collect_submodules("h11")
+# litellm + deps (raccolti sopra con collect_all)
+hiddenimports += collected_hidden
 hiddenimports += [
     "openpyxl",
     "dotenv",
@@ -99,7 +118,7 @@ block_cipher = None
 a = Analysis(
     [str(ROOT / "cicerone" / "desktop" / "launcher.py")],
     pathex=[str(ROOT)],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -158,8 +177,8 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "Cicerone",
         "CFBundleDisplayName": "Cicerone",
-        "CFBundleShortVersionString": "0.1.3",
-        "CFBundleVersion": "0.1.3",
+        "CFBundleShortVersionString": "0.2.0",
+        "CFBundleVersion": "0.2.0",
         "LSUIElement": False,
         "NSHighResolutionCapable": True,
         "NSHumanReadableCopyright": "© 2026 Cicerone",

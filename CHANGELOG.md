@@ -7,6 +7,8 @@ progetto aderisce al [Versionamento Semantico](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-19
+
 ### Changed
 
 - **Layer LLM provider-agnostico (litellm)**: le chiamate ai modelli passano
@@ -54,6 +56,12 @@ progetto aderisce al [Versionamento Semantico](https://semver.org/lang/it/).
 
 - Sidebar: rimosso il contatore "Criterio X/N" durante l'intervista (le fasi in
   alto bastano).
+
+### Packaging
+
+- Rimossa la dipendenza `anthropic` (sostituita da `litellm`).
+- `packaging/cicerone.spec`: bundle di `litellm` e dipendenze (tiktoken, openai,
+  tokenizers) via `collect_all` + metadata, per il `.app`/`.dmg`.
 
 ### Docs
 

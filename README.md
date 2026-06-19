@@ -2,7 +2,7 @@
 
 > La voce che orienta la tua PMI nell'adozione dell'AI.
 
-> ⚠️ **Demo / prototipo in sviluppo attivo.** L'app attuale (`v0.1.3`) è una
+> ⚠️ **Demo / prototipo in sviluppo attivo.** L'app attuale (`v0.2.0`) è una
 > **demo funzionante** costruita rapidamente in stile *vibe coding*: serve a
 > dimostrare il flusso end-to-end, non è codice di produzione consolidato. È
 > in corso una **riscrittura da zero dell'interfaccia in [Flet](https://flet.dev/)**
