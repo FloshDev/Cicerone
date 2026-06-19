@@ -7,6 +7,34 @@ progetto aderisce al [Versionamento Semantico](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Redesign UI Streamlit in direzione SaaS**: restyle completo di `style.css`
+  e dei singoli step (`onboarding`, `intervista`, `vincitore`, `report`),
+  rimozione della chrome di default di Streamlit, logo e favicon brandizzati.
+- **Intervista guidata dal modello**: è l'LLM a decidere se un criterio è
+  coperto o se serve un altro turno (chiarimento/approfondimento), invece di un
+  numero di turni fisso.
+- **Rebrand terminologia globale Readiness → Rediness**: allineamento su
+  schema DB, seed, MCDA, risorse e test.
+- **Rename `cicerone/ui/pages/` → `cicerone/ui/_pages/`**: il prefisso `_`
+  evita che Streamlit tratti i moduli come pagine multipage automatiche.
+- Asset di branding: logo sorgente ed elaborato in `resources/branding/`.
+
+### Fixed
+
+- **Crash al parsing JSON dell'intervista**: risposte del modello non
+  serializzabili facevano crashare lo step; parsing reso robusto.
+
+### Docs
+
+- Brief di migrazione UI Streamlit → Flet in cartella isolata `flet_ui/`
+  (`flet_ui/BRIEF-FLET-UI.md`).
+- `ARCHITECTURE.md` e `ROADMAP.md` aggiornati su `_pages/`, intervista a turni,
+  redesign SaaS e migrazione Flet pianificata.
+- `docs/superpowers/` aggiunta a `.gitignore` (documentazione interna, fuori
+  dal repo pubblico).
+
 ## [0.1.3] - 2026-06-15
 
 ### Fixed

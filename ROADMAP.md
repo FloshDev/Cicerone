@@ -3,6 +3,19 @@
 Lavori futuri non inclusi nel round corrente. Sono idee di direzione, non
 impegni con scadenza.
 
+## In corso
+
+- **Riscrittura UI in Flet** — sostituzione dell'interfaccia Streamlit con una
+  UI nativa [Flet](https://flet.dev/), sviluppata in isolamento in `flet_ui/`
+  (vedi `flet_ui/BRIEF-FLET-UI.md`). Backend (DB, MCDA, LLM) invariato.
+
+## Funzionalità — seconda fase
+
+- **AI Implementation** — secondo sheet di framework (`implementation`):
+  percorso parallelo all'AI Rediness per aziende già pronte che passano
+  all'adozione effettiva. Interfaccia e logica MCDA già predisposte; mancano i
+  contenuti della knowledge base e i prompt LLM specifici.
+
 ## Distribuzione
 
 - **Code signing e notarization Apple** — firmare e notarizzare il bundle macOS

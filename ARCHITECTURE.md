@@ -40,8 +40,9 @@ Il punteggio MCDA di un framework è la somma, su tutti i criteri, di
     l'override della chiave da runtime (UI); `get_client()` usa l'override se
     presente, altrimenti legge `ANTHROPIC_API_KEY` dall'ambiente.
   - `intervista.py`: genera una domanda per criterio tarata sul contesto e
-    parsa la risposta libera in `(livello, peso, motivazione, ambiguo)`,
-    chiedendo un chiarimento quando la risposta è inutilizzabile.
+    parsa la risposta libera in `(livello, peso, motivazione, ambiguo)`. È il
+    modello stesso a decidere se il criterio è risolto o se serve un altro
+    turno (chiarimento o approfondimento), invece di un numero di turni fisso.
   - `diagnostica.py`: diagnostica multi-turno post-MCDA. Carica la knowledge
     del framework vincitore, pone da 3 a 5 domande (una alla volta) e rifà la
     domanda in modo più mirato sulle risposte vaghe.
@@ -51,10 +52,17 @@ Il punteggio MCDA di un framework è la somma, su tutti i criteri, di
   - `calcolo.py`: `classifica_framework()`, `breakdown_per_criterio()` e
     `vincitore()`. Implementano lo SUMPRODUCT come query SQL.
 - **`cicerone/ui/`** — interfaccia Streamlit.
-  - `app.py`: entry point e orchestrazione del flusso a step.
-  - `pages/`: i singoli step (onboarding, intervista, vincitore, diagnostica) e
-    helper condivisi.
-  - `style.css`: identità visiva (vedi Design system).
+  - `app.py`: entry point e orchestrazione del flusso a step; rimuove la chrome
+    di default di Streamlit e imposta logo/favicon brandizzati.
+  - `_pages/`: i singoli step (onboarding, intervista, vincitore, diagnostica,
+    report) e helper condivisi (`_shared.py`). Prefisso `_` per evitare che
+    Streamlit li tratti come pagine multipage automatiche.
+  - `style.css`: identità visiva, redesign in direzione SaaS (vedi Design
+    system).
+  - **Migrazione in corso:** la UI Streamlit verrà sostituita da una riscrittura
+    in [Flet](https://flet.dev/), sviluppata in isolamento nella cartella
+    `flet_ui/` (vedi `flet_ui/BRIEF-FLET-UI.md`). Il backend (`db`, `mcda`,
+    `llm`) resta invariato: solo il layer di presentazione cambia.
 - **`cicerone/desktop/`** — launcher desktop (entry point `cicerone.desktop:main`,
   esportato dal package `__init__.py`).
   - `launcher.py`: avvio del bundle (porta locale, override path, Streamlit
@@ -72,8 +80,9 @@ Il punteggio MCDA di un framework è la somma, su tutti i criteri, di
    `Assessment` con il contesto.
 2. **Intervista** — per ciascun criterio l'LLM (`llm/intervista.py`) genera una
    domanda contestualizzata; la risposta libera viene parsata in livello/peso e
-   salvata in `peso_assessment`. Su risposte non comprensibili l'LLM chiede un
-   chiarimento prima di accettare.
+   salvata in `peso_assessment`. È il modello a decidere quando il criterio è
+   coperto: su risposte vaghe o non comprensibili apre un altro turno
+   (chiarimento o approfondimento) prima di passare al criterio successivo.
 3. **Calcolo MCDA** — `mcda/calcolo.py` classifica gli 11 framework per
    `Σ(voto × peso)` e determina il vincitore, salvato sull'assessment.
 4. **Diagnostica** — `llm/diagnostica.py` carica la knowledge del framework
