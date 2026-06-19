@@ -42,6 +42,7 @@ button.secondary:hover{{background:#f4efe3;color:#222}}
 .status.info{{display:block;background:#f4efe3;color:#5a4a1f;border:1px solid #e6dcc4}}
 .row{{display:flex;gap:.6rem;align-items:center}}
 .row input{{flex:1}}
+.row button{{margin-top:0}}
 </style></head><body>
 <div class="card">
   <h1>Cicerone</h1>
