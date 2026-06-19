@@ -7,6 +7,13 @@ progetto aderisce al [Versionamento Semantico](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Ripristinata la terminologia "AI Readiness"** ovunque (codice, UI, docs,
+  risorse): annullato il refuso "Rediness" introdotto in 0.2.0. Rinominati lo
+  sheet DB (`readiness`), il foglio Excel (`AI Readiness-Maturity`) e il file
+  `resources/Criteri_Readiness_Maturity.md`.
+
 ## [0.2.0] - 2026-06-19
 
 ### Changed
@@ -27,8 +34,6 @@ progetto aderisce al [Versionamento Semantico](https://semver.org/lang/it/).
 - **Intervista guidata dal modello**: è l'LLM a decidere se un criterio è
   coperto o se serve un altro turno (chiarimento/approfondimento), invece di un
   numero di turni fisso.
-- **Rebrand terminologia globale Readiness → Rediness**: allineamento su
-  schema DB, seed, MCDA, risorse e test.
 - **Rename `cicerone/ui/pages/` → `cicerone/ui/_pages/`**: il prefisso `_`
   evita che Streamlit tratti i moduli come pagine multipage automatiche.
 - Asset di branding: logo sorgente ed elaborato in `resources/branding/`.

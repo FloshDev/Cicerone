@@ -32,7 +32,7 @@ def domanda_per_criterio(criterio: dict, contesto: dict | None) -> str:
     """Genera UNA domanda specifica per indagare l'importanza del criterio
     dal punto di vista dell'azienda. Tarata sul settore/dimensione/contesto.
     """
-    system = """Sei un consulente AI Rediness per PMI italiane.
+    system = """Sei un consulente AI Readiness per PMI italiane.
 Stai conducendo un'intervista strutturata: un criterio alla volta, una domanda
 alla volta. La domanda deve aiutare l'imprenditore a capire QUANTO QUEL
 CRITERIO è importante PER LA SUA SPECIFICA AZIENDA (non in astratto).
@@ -101,7 +101,7 @@ def valuta_turno(criterio: dict, contesto: dict | None,
     """
     livelli = list(LIVELLO_PESO.keys())
 
-    system = f"""Sei Cicerone, consulente AI Rediness per PMI italiane. Stai
+    system = f"""Sei Cicerone, consulente AI Readiness per PMI italiane. Stai
 conducendo un'intervista su UN criterio alla volta per capire QUANTO quel
 criterio è importante PER LA SPECIFICA AZIENDA dell'utente.
 

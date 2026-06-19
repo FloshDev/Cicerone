@@ -65,7 +65,7 @@ def _system_prompt(contesto: dict, pesi: list[dict], framework_md: str,
     )
     contesto_str = "\n".join(f"- {k}: {v}" for k, v in contesto.items()) if contesto else "Nessun contesto fornito."
 
-    return f"""Sei un consulente esperto di AI Rediness per PMI italiane.
+    return f"""Sei un consulente esperto di AI Readiness per PMI italiane.
 Stai conducendo una diagnostica conversazionale per approfondire la maturità AI
 di un'azienda confrontandola con il framework che è risultato il più adatto
 secondo l'analisi MCDA.

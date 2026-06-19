@@ -12,7 +12,7 @@ impegni con scadenza.
 ## Funzionalità — seconda fase
 
 - **AI Implementation** — secondo sheet di framework (`implementation`):
-  percorso parallelo all'AI Rediness per aziende già pronte che passano
+  percorso parallelo all'AI Readiness per aziende già pronte che passano
   all'adozione effettiva. Interfaccia e logica MCDA già predisposte; mancano i
   contenuti della knowledge base e i prompt LLM specifici.
 

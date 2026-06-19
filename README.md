@@ -10,8 +10,8 @@
 > che sostituirà l'attuale UI Streamlit lasciando il backend (DB, MCDA, LLM)
 > intatto. Aspettarsi quindi UI e dettagli soggetti a cambiamenti.
 >
-> **Copertura attuale:** la demo copre l'intero flusso di **AI Rediness**
-> (intervista, MCDA, diagnostica, report) sullo sheet `rediness`. La parte
+> **Copertura attuale:** la demo copre l'intero flusso di **AI Readiness**
+> (intervista, MCDA, diagnostica, report) sullo sheet `readiness`. La parte
 > dedicata all'**AI Implementation** — secondo sheet di framework, percorso
 > parallelo per aziende già pronte che vogliono passare all'adozione effettiva
 > — verrà rilasciata in una **seconda fase**. Interfaccia e logica MCDA sono
@@ -19,7 +19,7 @@
 > specifici.
 
 Cicerone è un agente AI conversazionale che aiuta le PMI europee a valutare
-la propria AI Rediness/Maturity scegliendo, fra 11 framework accademici, quello
+la propria AI Readiness/Maturity scegliendo, fra 11 framework accademici, quello
 più adatto al loro contesto. Il flusso guida l'utente attraverso un'intervista
 condotta da un LLM, un calcolo MCDA che determina il framework vincitore, una
 diagnostica multi-turno sui gap e infine un report markdown personalizzato con
@@ -123,7 +123,7 @@ cicerone/                  # package Python
 flet_ui/                   # riscrittura UI in Flet (lavoro isolato, work in progress)
 packaging/                 # build .app/.dmg (PyInstaller + pywebview)
 resources/                 # asset statici consumati dal seed
-├── Criteri_Rediness_Maturity.md  # definizioni dei criteri
+├── Criteri_Readiness_Maturity.md  # definizioni dei criteri
 └── MatriceDB.xlsx                 # matrice criteri/framework/voti
 knowledge/                 # knowledge base privata (clonata a parte, gitignored)
 pyproject.toml             # configurazione progetto, dipendenze, ruff
@@ -135,7 +135,7 @@ Per i dettagli su moduli, flusso dati e design system vedi
 
 ## Glossario di dominio
 
-- **Criterio** — dimensione di valutazione dell'AI Rediness (es. competenze,
+- **Criterio** — dimensione di valutazione dell'AI Readiness (es. competenze,
   dati, governance). I criteri sono fissi e definiti nel seed.
 - **Peso** — quanto un criterio è importante per la specifica azienda, inferito
   dall'LLM a partire dalla risposta libera dell'utente in intervista. Espresso
@@ -145,10 +145,10 @@ Per i dettagli su moduli, flusso dati e design system vedi
   sulla stessa scala discreta del peso.
 - **Assessment** — una singola sessione di valutazione: contesto azienda, pesi
   raccolti, framework vincitore, diagnostica.
-- **Framework** — uno degli 11 modelli accademici di AI Rediness/Maturity tra
+- **Framework** — uno degli 11 modelli accademici di AI Readiness/Maturity tra
   cui Cicerone sceglie il più adatto.
-- **Sheet** — categoria che raggruppa criteri e framework (`rediness` /
-  `implementation`); il flusso utente lavora sullo sheet `rediness`.
+- **Sheet** — categoria che raggruppa criteri e framework (`readiness` /
+  `implementation`); il flusso utente lavora sullo sheet `readiness`.
 - **Diagnostica** — fase conversazionale multi-turno, successiva al calcolo
   MCDA, in cui l'LLM approfondisce i gap dell'azienda rispetto al framework
   vincitore prima di generare il report.
@@ -160,7 +160,7 @@ Cicerone nasce da una **collaborazione spontanea fra studenti** della
 Svizzera Italiana) e dell'[Università degli Studi dell'Insubria](https://www.uninsubria.it/)
 (sede di Varese). Il gruppo si è ritrovato in modo autonomo, fuori dai canali
 istituzionali, con l'obiettivo di portare strumenti accademici di AI
-Rediness/Maturity — oggi rinchiusi in paper accademici poco accessibili — a
+Readiness/Maturity — oggi rinchiusi in paper accademici poco accessibili — a
 portata di mano delle PMI europee.
 
 Il progetto è guidato da questa collaborazione transfrontaliera e mantiene

@@ -48,7 +48,7 @@ salva_contesto = repo.salva_contesto
 STYLE_CSS = Path(__file__).parent.parent / "style.css"
 LOGO_PATH = Path(__file__).parent.parent.parent.parent / "resources" / "branding" / "logo.png"
 
-SHEET = "rediness"
+SHEET = "readiness"
 
 TAGLINE = "La voce che orienta la tua PMI nell'adozione dell'AI."
 

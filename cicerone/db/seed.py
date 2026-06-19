@@ -8,10 +8,10 @@ from cicerone.db.connection import get_connection
 ROOT = Path(__file__).parent.parent.parent
 RESOURCES = ROOT / "resources"
 MATRICE_XLSX = RESOURCES / "MatriceDB.xlsx"
-CRITERI_MD = RESOURCES / "Criteri_Rediness_Maturity.md"
+CRITERI_MD = RESOURCES / "Criteri_Readiness_Maturity.md"
 
-SHEET_REDINESS = "AI Rediness-Maturity"
-SHEET_NOMI = ["rediness", "implementation"]
+SHEET_READINESS = "AI Readiness-Maturity"
+SHEET_NOMI = ["readiness", "implementation"]
 
 RIGA_HEADER = 5
 COL_NUM_CRITERIO = 1
@@ -46,11 +46,11 @@ def run_if_needed() -> None:
         if not _is_vuoto(conn):
             return
         _seed_sheet(conn)
-        sheet_id_rediness = conn.execute(
-            "SELECT idSheet FROM Sheet WHERE nome = 'rediness'"
+        sheet_id_readiness = conn.execute(
+            "SELECT idSheet FROM Sheet WHERE nome = 'readiness'"
         ).fetchone()[0]
-        _seed_criteri(conn, sheet_id_rediness)
-        _seed_framework_e_voti(conn, sheet_id_rediness)
+        _seed_criteri(conn, sheet_id_readiness)
+        _seed_framework_e_voti(conn, sheet_id_readiness)
         conn.commit()
 
 
@@ -75,7 +75,7 @@ def _seed_criteri(conn, sheet_id: int) -> None:
 
 def _seed_framework_e_voti(conn, sheet_id: int) -> None:
     wb = load_workbook(MATRICE_XLSX, data_only=True)
-    ws = wb[SHEET_REDINESS]
+    ws = wb[SHEET_READINESS]
 
     nomi_framework: list[tuple[int, str]] = []
     for col in range(COL_PRIMO_FRAMEWORK, ws.max_column + 1):

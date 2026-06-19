@@ -32,7 +32,7 @@ def _init_db_once() -> None:
         conn.executescript(SCHEMA_SQL.read_text(encoding="utf-8"))
         conn.commit()
 
-    # Seed reale: legge MatriceDB.xlsx + Criteri_Rediness_Maturity.md da resources/.
+    # Seed reale: legge MatriceDB.xlsx + Criteri_Readiness_Maturity.md da resources/.
     from cicerone.db import seed
 
     seed.run_if_needed()
@@ -51,9 +51,9 @@ def db_path() -> Path:
 
 @pytest.fixture
 def assessment_id():
-    """Crea un assessment fresco sullo sheet 'rediness' per ogni test che lo
+    """Crea un assessment fresco sullo sheet 'readiness' per ogni test che lo
     richiede. Ogni assessment ha un id distinto -> indipendenza dall'ordine.
     """
     from cicerone.db import repository
 
-    return repository.crea_assessment("rediness")
+    return repository.crea_assessment("readiness")

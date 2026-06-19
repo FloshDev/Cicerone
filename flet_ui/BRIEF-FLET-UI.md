@@ -45,7 +45,7 @@ Queste regole valgono per te e per il tuo assistente Claude.
 
 ## 1. Cosa fa l'app (flusso utente)
 
-Assessment "AI Rediness" per PMI, in 5 fasi sequenziali:
+Assessment "AI Readiness" per PMI, in 5 fasi sequenziali:
 
 ```
 I  onboarding   → profilo azienda + verifica API key Anthropic
@@ -195,7 +195,7 @@ Successo = chiave valida; eccezione = mostra il messaggio d'errore (troncato).
 ## 5. Dati di dominio & stato
 
 ### Costanti (riusabili — sono in `cicerone/ui/_pages/_shared.py`, solo lettura)
-- `SHEET = "rediness"` (l'unico foglio usato)
+- `SHEET = "readiness"` (l'unico foglio usato)
 - `FASI` = lista ordinata `(chiave, etichetta)` delle 5 fasi
 - `ROMANI = ["I","II","III","IV","V"]`
 - `LIVELLO_PESO` = mappa livello→peso (Fondamentale 10.0 … Non importante 0.0)

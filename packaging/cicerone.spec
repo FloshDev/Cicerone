@@ -28,7 +28,7 @@ datas = [
     (str(ROOT / "cicerone" / "ui" / "style.css"), "cicerone/ui"),
     (str(ROOT / "cicerone" / "ui" / "app.py"), "cicerone/ui"),
     (str(ROOT / "resources" / "MatriceDB.xlsx"), "resources"),
-    (str(ROOT / "resources" / "Criteri_Rediness_Maturity.md"), "resources"),
+    (str(ROOT / "resources" / "Criteri_Readiness_Maturity.md"), "resources"),
     (str(ROOT / "resources" / "branding" / "logo.png"), "resources/branding"),
     (str(ROOT / ".streamlit" / "config.toml"), ".streamlit"),
 ]

@@ -1,7 +1,7 @@
 CREATE TABLE Sheet (
       idSheet INTEGER PRIMARY KEY,
       nome    VARCHAR(20) NOT NULL UNIQUE
-              CHECK (nome IN ('rediness','implementation'))
+              CHECK (nome IN ('readiness','implementation'))
   );
 
   CREATE TABLE Criterio (

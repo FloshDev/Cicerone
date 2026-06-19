@@ -113,7 +113,7 @@ def sidebar_stepper() -> None:
 
     st.sidebar.markdown(
         '<div class="cic-sidebar-title">Cicerone</div>'
-        '<div class="cic-sidebar-caption">AI Rediness</div>',
+        '<div class="cic-sidebar-caption">AI Readiness</div>',
         unsafe_allow_html=True,
     )
 

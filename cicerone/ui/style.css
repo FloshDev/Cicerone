@@ -299,7 +299,7 @@ html, body, .stApp { color-scheme: light; }
 .cic-badge-idle  { color: var(--cic-text-muted); }
 
 /* Riga "API key" in sidebar: centrata, label uppercase muted coerente col
-   resto (come la caption "AI REDINESS"), pill di stato accanto. */
+   resto (come la caption "AI READINESS"), pill di stato accanto. */
 .cic-apikey-row {
     display: flex;
     align-items: center;
