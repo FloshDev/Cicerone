@@ -1,7 +1,7 @@
 # Brief — Nuova UI Flet per Cicerone (lavoro isolato)
 
 Documento di consegna per chi costruisce la nuova interfaccia Flet di Cicerone.
-**Da leggere per intero prima di scrivere una riga di codice**, anche dal tuo Claude.
+**Da leggere per intero prima di scrivere una riga di codice**.
 
 L'app oggi ha una UI in Streamlit. L'obiettivo è ricostruire la stessa UI in
 **Flet**, lasciando il backend (DB, MCDA, LLM) **completamente intatto**. Il
