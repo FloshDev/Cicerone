@@ -20,6 +20,13 @@ header[data-testid="stHeader"] {
 
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 
+/* Forza sempre il tema chiaro: in dark mode del SO i controlli nativi e parte
+   della UI andavano scuri/illeggibili. */
+:root {
+    color-scheme: light;
+}
+html, body, .stApp { color-scheme: light; }
+
 :root {
     --cic-amber: #E8B84B;
     --cic-amber-dark: #B8881F;

@@ -76,6 +76,14 @@ def _avvia_streamlit_in_thread(porta: int) -> threading.Thread:
         "browser_gatherUsageStats": False,
         "server_fileWatcherType": "none",
         "global_developmentMode": False,
+        # Tema light forzato: nel bundle il .streamlit/config.toml può non essere
+        # raccolto e in dark mode del SO la finestra diventava nera/illeggibile.
+        # Passando il tema qui è sempre il "classico" chiaro.
+        "theme_base": "light",
+        "theme_primaryColor": "#E8B84B",
+        "theme_backgroundColor": "#FAFAF7",
+        "theme_secondaryBackgroundColor": "#F2EFE8",
+        "theme_textColor": "#1F2329",
     }
 
     def _run() -> None:

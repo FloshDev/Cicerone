@@ -12,6 +12,7 @@ def _setup_html(default_repo_url: str) -> str:
 <title>Cicerone — Setup</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Inter:wght@400;500&display=swap');
+:root{{color-scheme:light}}
 *{{box-sizing:border-box}}
 body{{margin:0;min-height:100vh;background:#fafaf7;color:#222;
   font-family:'Inter',-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;padding:2rem}}

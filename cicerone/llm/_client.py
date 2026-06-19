@@ -68,27 +68,13 @@ def complete(system: str, messages: list, max_tokens: int) -> str:
             **extra,
         )
     except litellm.RateLimitError as e:
-        raise LLMError(
-            "Limite di richieste del provider raggiunto (rate limit / quota). "
-            "Attendi qualche secondo e riprova. Se usi un piano free, potresti "
-            "aver esaurito la quota giornaliera del modello."
-        ) from e
+        raise LLMError("Limite richieste raggiunto") from e
     except litellm.AuthenticationError as e:
-        raise LLMError(
-            "Chiave API non valida o non autorizzata per questo modello."
-        ) from e
+        raise LLMError("Chiave non valida") from e
     except litellm.NotFoundError as e:
-        raise LLMError(
-            "Modello non trovato: controlla la stringa modello (es. "
-            "gemini/gemini-2.5-flash, openai/gpt-4o)."
-        ) from e
+        raise LLMError("Modello non trovato") from e
     except litellm.BadRequestError as e:
-        raise LLMError(
-            "Richiesta non valida per questo modello: controlla la stringa "
-            "modello e che la chiave corrisponda al provider."
-        ) from e
+        raise LLMError("Modello o chiave non validi") from e
     except Exception as e:
-        raise LLMError(
-            f"Errore nella chiamata al modello: {type(e).__name__}."
-        ) from e
+        raise LLMError("Errore del modello") from e
     return resp.choices[0].message.content
