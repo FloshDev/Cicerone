@@ -1,9 +1,10 @@
 """Unit test per cicerone.llm.intervista.valuta_turno / domanda_per_criterio.
 
-NESSUNA chiamata di rete: il client Anthropic è monkeypatchato. `intervista.py`
-chiama `get_client().messages.create(...)` e legge `resp.content[0].text`.
-Costruiamo un fake client che ritorna un testo "canned" prefissato, così da
-pilotare i tre rami di valuta_turno (chiudi / approfondisci / spiega).
+NESSUNA chiamata di rete: l'helper `complete` di `_client` è monkeypatchato.
+`intervista.py` chiama `complete(system=..., messages=..., max_tokens=...)` e
+usa direttamente la stringa ritornata. Costruiamo un fake `complete` che
+registra le call e ritorna un testo "canned", così da pilotare i tre rami di
+valuta_turno (chiudi / approfondisci / spiega).
 """
 import json
 
@@ -12,44 +13,29 @@ import pytest
 from cicerone.llm import intervista
 
 
-# --- Fake client che imita la forma resp.content[0].text ---------------------
-class _FakeBlock:
-    def __init__(self, text: str):
-        self.text = text
-
-
-class _FakeResponse:
-    def __init__(self, text: str):
-        self.content = [_FakeBlock(text)]
-
-
-class _FakeMessages:
+# --- Fake complete che registra le call e ritorna testo canned ---------------
+class _FakeComplete:
     def __init__(self, canned_text: str):
         self._canned_text = canned_text
         self.calls: list[dict] = []
 
-    def create(self, **kwargs):
-        self.calls.append(kwargs)
-        return _FakeResponse(self._canned_text)
-
-
-class _FakeClient:
-    def __init__(self, canned_text: str):
-        self.messages = _FakeMessages(canned_text)
+    def __call__(self, system: str, messages: list, max_tokens: int):
+        self.calls.append(
+            {"system": system, "messages": messages, "max_tokens": max_tokens}
+        )
+        return self._canned_text
 
 
 @pytest.fixture
 def patch_client(monkeypatch):
     """Ritorna un factory: data una stringa canned, monkeypatcha
-    intervista.get_client per restituire un fake client con quella risposta.
-    Espone il fake client (per ispezionare le call)."""
-    holder = {}
+    intervista.complete per ritornare quel testo. Espone il fake complete
+    (per ispezionare le call)."""
 
     def _install(canned_text: str):
-        client = _FakeClient(canned_text)
-        monkeypatch.setattr(intervista, "get_client", lambda: client)
-        holder["client"] = client
-        return client
+        fake = _FakeComplete(canned_text)
+        monkeypatch.setattr(intervista, "complete", fake)
+        return fake
 
     return _install
 
@@ -222,23 +208,21 @@ def test_azione_sconosciuta_diventa_chiudi(patch_client):
 
 
 def test_valuta_turno_no_rete_nessun_client_reale(patch_client):
-    """Sanity: la call passa per il fake client (registra la create)."""
+    """Sanity: la call passa per il fake complete (registra l'invocazione)."""
     canned = json.dumps({"azione": "chiudi", "livello": "Importante",
                          "motivazione": "x", "ambiguo": False})
-    client = patch_client(canned)
+    fake = patch_client(canned)
     intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
-    assert len(client.messages.calls) == 1
-    # Conferma che il modello richiesto è quello configurato in intervista.
-    assert client.messages.calls[0]["model"] == intervista.MODEL
+    assert len(fake.calls) == 1
 
 
 def test_valuta_turno_history_nel_prompt(patch_client):
     """La conversazione (history) deve finire nel prompt user del modello."""
     canned = json.dumps({"azione": "chiudi", "livello": "Importante",
                          "motivazione": "x", "ambiguo": False})
-    client = patch_client(canned)
+    fake = patch_client(canned)
     intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
-    user_msg = client.messages.calls[0]["messages"][0]["content"]
+    user_msg = fake.calls[0]["messages"][0]["content"]
     assert "Abbastanza importante." in user_msg  # contenuto risposta utente
 
 
@@ -254,16 +238,15 @@ def test_json_malformato_non_crasha_chiude_best_effort(patch_client):
     assert out["ambiguo"] is True
 
 
-def test_output_struttura_json_schema_richiesto(patch_client):
-    """valuta_turno deve richiedere structured outputs (output_config.format)
-    per forzare JSON valido lato modello."""
+def test_output_json_richiesto_nel_system(patch_client):
+    """valuta_turno deve istruire il modello a emettere SOLO JSON valido nel
+    system prompt (niente structured outputs provider-specifici con litellm)."""
     canned = json.dumps({"azione": "chiudi", "livello": "Importante",
                          "motivazione": "x", "ambiguo": False})
-    client = patch_client(canned)
+    fake = patch_client(canned)
     intervista.valuta_turno(CRITERIO, CONTESTO, HISTORY, 1)
-    fmt = client.messages.calls[0].get("output_config", {}).get("format", {})
-    assert fmt.get("type") == "json_schema"
-    assert "schema" in fmt
+    system = fake.calls[0]["system"]
+    assert "JSON" in system
 
 
 # --- domanda_per_criterio ----------------------------------------------------
@@ -275,9 +258,9 @@ def test_domanda_per_criterio(patch_client):
 
 
 def test_domanda_per_criterio_contesto_none(patch_client):
-    client = patch_client("Una domanda generica?")
+    fake = patch_client("Una domanda generica?")
     domanda = intervista.domanda_per_criterio(CRITERIO, None)
     assert domanda == "Una domanda generica?"
     # Contesto None -> stringa 'Nessun contesto fornito.' finisce nel prompt user.
-    user_msg = client.messages.calls[0]["messages"][0]["content"]
+    user_msg = fake.calls[0]["messages"][0]["content"]
     assert "Nessun contesto fornito." in user_msg

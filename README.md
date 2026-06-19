@@ -26,8 +26,12 @@ diagnostica multi-turno sui gap e infine un report markdown personalizzato con
 roadmap prioritizzata e KPI da monitorare.
 
 È disponibile sia come web app (Streamlit, eseguita in locale) sia come
-applicazione desktop macOS (`.app` / `.dmg`). I modelli usati sono Anthropic
-Claude (Haiku per intervista e diagnostica, Sonnet per il report).
+applicazione desktop macOS (`.app` / `.dmg`). Le chiamate ai modelli passano
+per [litellm](https://docs.litellm.ai/), quindi puoi usare la chiave del
+**modello che preferisci** (Anthropic, OpenAI, Gemini, ecc.) indicando la
+stringa modello nel formato litellm. Il progetto è stato sviluppato e testato
+con modelli Anthropic Claude (storicamente Haiku per intervista/diagnostica e
+Sonnet per il report), che restano i default suggeriti.
 
 ## Stack
 
@@ -35,7 +39,7 @@ Claude (Haiku per intervista e diagnostica, Sonnet per il report).
 - [uv](https://github.com/astral-sh/uv) — gestione progetto e dipendenze
 - Streamlit — interfaccia web
 - SQLite — persistenza locale single-file
-- Anthropic SDK — chiamate ai modelli Claude
+- [litellm](https://docs.litellm.ai/) — layer LLM multi-provider (chiamate al modello scelto)
 
 Lettura del seed da Excel via `openpyxl`; variabili d'ambiente via
 `python-dotenv`. Tooling di sviluppo: `ruff` (lint) e `pytest` (test).
@@ -62,16 +66,22 @@ SQLite viene applicato e il database viene popolato (seed dei criteri, degli
 11 framework e dei voti MCDA). Il database locale persiste in
 `cicerone/data/cicerone.sqlite` (gitignored).
 
-### ANTHROPIC_API_KEY
+### API key e modello
 
-Serve una chiave Anthropic per le chiamate ai modelli. Due modi equivalenti:
+Serve una API key per le chiamate ai modelli. Il modello è configurabile: di
+default è `anthropic/claude-sonnet-4-6`, ma puoi indicare qualsiasi stringa
+modello supportata da litellm (es. `openai/gpt-4o`, `gemini/gemini-2.0-flash`).
+Lo stesso modello viene usato per intervista, diagnostica e report.
 
-- **UI (onboarding):** incolla `sk-ant-...` nel campo dedicato. Vale per la
-  sessione corrente e non viene mai persistita su disco.
-- **`.env` (sviluppo):** copia `.env.example` in `.env` e inserisci la chiave.
-  Viene letta automaticamente all'avvio. `.env` è gitignored.
+- **UI (onboarding):** indica la stringa modello e incolla la chiave del
+  relativo provider nei campi dedicati. Valgono per la sessione corrente e non
+  vengono mai persistite su disco.
+- **`.env` (sviluppo):** copia `.env.example` in `.env` e inserisci la chiave
+  del provider (litellm legge le env var standard, es. `ANTHROPIC_API_KEY`,
+  `OPENAI_API_KEY`). Override del modello via `CICERONE_MODEL`. `.env` è
+  gitignored.
 
-Se entrambe sono presenti, la chiave inserita dalla UI ha precedenza.
+Se presenti, i valori inseriti dalla UI hanno precedenza.
 
 ## Quickstart (desktop)
 
@@ -83,7 +93,7 @@ base al primo avvio, vedi [`packaging/README.md`](packaging/README.md).
 ```
 cicerone/                  # package Python
 ├── db/                    # connessione, schema SQL, seed, repository
-├── llm/                   # intervista, diagnostica, report, client Anthropic
+├── llm/                   # intervista, diagnostica, report, client LLM (litellm)
 ├── mcda/                  # calcolo MCDA (classifica framework)
 ├── ui/                    # interfaccia Streamlit attuale (app + _pages + style.css)
 ├── desktop/               # launcher desktop (launcher, paths, setup knowledge)
@@ -96,7 +106,7 @@ resources/                 # asset statici consumati dal seed
 └── MatriceDB.xlsx                 # matrice criteri/framework/voti
 knowledge/                 # knowledge base privata (clonata a parte, gitignored)
 pyproject.toml             # configurazione progetto, dipendenze, ruff
-.env.example               # template per ANTHROPIC_API_KEY
+.env.example               # template per API key del provider + CICERONE_MODEL
 ```
 
 Per i dettagli su moduli, flusso dati e design system vedi

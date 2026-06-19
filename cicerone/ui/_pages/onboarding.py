@@ -6,10 +6,11 @@ import streamlit as st
 from cicerone.ui._pages._shared import (
     SHEET,
     _idx_o_default,
-    get_client,
+    complete,
     repo,
     salva_contesto,
     set_api_key,
+    set_model,
     spinner_cicerone,
     vai_a,
     wizard_header,
@@ -39,15 +40,12 @@ NAZIONI_EUROPA = [
 ]
 
 
-def verifica_chiave(api_key: str) -> tuple[bool, str]:
-    """Test minimo con call di 10 token a haiku — costo trascurabile."""
+def verifica_chiave(api_key: str, model: str) -> tuple[bool, str]:
+    """Test minimo con call di 10 token al modello scelto — costo trascurabile."""
     set_api_key(api_key)
+    set_model(model)
     try:
-        get_client().messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=10,
-            messages=[{"role": "user", "content": "ping"}],
-        )
+        complete(system="", messages=[{"role": "user", "content": "ping"}], max_tokens=10)
         return True, "Chiave valida."
     except Exception as e:
         return False, f"{type(e).__name__}: {str(e)[:200]}"
@@ -55,11 +53,21 @@ def verifica_chiave(api_key: str) -> tuple[bool, str]:
 
 def blocco_api_key() -> None:
     st.markdown('<div class="cic-card-header">Configurazione</div>', unsafe_allow_html=True)
+    model = st.text_input(
+        "Modello",
+        value=st.session_state.model,
+        placeholder="anthropic/claude-sonnet-4-6",
+        help=(
+            "Stringa modello in formato litellm. Esempi: "
+            "`anthropic/claude-sonnet-4-6`, `openai/gpt-4o`, "
+            "`gemini/gemini-2.0-flash`."
+        ),
+    )
     api_key = st.text_input(
-        "Anthropic API Key",
+        "API Key",
         type="password",
         value=st.session_state.api_key,
-        placeholder="sk-ant-api03-...",
+        placeholder="La chiave del provider scelto",
         help="Necessaria per intervista, diagnostica e report. Non viene salvata su disco.",
     )
 
@@ -68,19 +76,23 @@ def blocco_api_key() -> None:
         verifica_clicked = st.button("Verifica chiave", type="primary", disabled=not api_key.strip())
 
     if verifica_clicked:
-        with spinner_cicerone("Sto verificando la chiave con un ping ad Anthropic..."):
-            ok, msg = verifica_chiave(api_key.strip())
+        with spinner_cicerone("Verifico la chiave..."):
+            ok, msg = verifica_chiave(api_key.strip(), model.strip())
         st.session_state.api_key = api_key.strip()
+        st.session_state.model = model.strip()
         st.session_state.api_key_valida = ok
         st.session_state.api_key_messaggio = msg
         st.rerun()
     elif api_key and api_key.strip() != st.session_state.api_key:
         st.session_state.api_key = api_key.strip()
+        st.session_state.model = model.strip()
         st.session_state.api_key_valida = None
         st.session_state.api_key_messaggio = ""
         set_api_key(api_key.strip())
+        set_model(model.strip())
     elif api_key:
         set_api_key(api_key.strip())
+        set_model(model.strip())
 
     with col_msg:
         if st.session_state.api_key_valida is True:

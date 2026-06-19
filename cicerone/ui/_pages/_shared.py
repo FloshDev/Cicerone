@@ -40,7 +40,7 @@ from cicerone.db import repository as repo  # noqa: E402  (import dopo bootstrap
 from cicerone.llm import diagnostica as llm_diag  # noqa: E402
 from cicerone.llm import intervista as llm_intervista  # noqa: E402
 from cicerone.llm import report as llm_report  # noqa: E402
-from cicerone.llm._client import get_client, set_api_key  # noqa: E402
+from cicerone.llm._client import complete, set_api_key, set_model  # noqa: E402
 from cicerone.mcda import calcolo as mcda  # noqa: E402
 
 salva_contesto = repo.salva_contesto
@@ -167,7 +167,7 @@ def get_criteri() -> list[dict]:
 __all__ = [
     # moduli/oggetti pesanti (re-export)
     "repo", "mcda", "llm_diag", "llm_intervista", "llm_report",
-    "get_client", "set_api_key", "salva_contesto",
+    "complete", "set_api_key", "set_model", "salva_contesto",
     # costanti
     "STYLE_CSS", "SHEET", "TAGLINE", "LIVELLO_PESO", "LIVELLI",
     "ROMANI", "FASI", "CHIAVI_RESET",

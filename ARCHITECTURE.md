@@ -35,10 +35,15 @@ Il punteggio MCDA di un framework è la somma, su tutti i criteri, di
   - `seed.py`: popolamento idempotente di criteri, framework e voti.
   - `repository.py`: API CRUD. Tutto l'SQL applicativo vive qui (eccetto le
     query di calcolo in `mcda/`).
-- **`cicerone/llm/`** — interazione con i modelli Claude.
-  - `_client.py`: client Anthropic condiviso. `set_api_key()` permette
-    l'override della chiave da runtime (UI); `get_client()` usa l'override se
-    presente, altrimenti legge `ANTHROPIC_API_KEY` dall'ambiente.
+- **`cicerone/llm/`** — interazione con i modelli, provider-agnostica via
+  [litellm](https://docs.litellm.ai/).
+  - `_client.py`: layer LLM condiviso. `set_api_key()` e `set_model()` permettono
+    l'override di chiave e modello da runtime (UI); `get_model()` usa l'override
+    se presente, altrimenti l'env `CICERONE_MODEL`, altrimenti il default
+    `anthropic/claude-sonnet-4-6`. `complete(system, messages, max_tokens)` è
+    l'unico helper applicativo: compone i messaggi e chiama
+    `litellm.completion()`. Tutti i moduli LLM passano di qui, così cambiare
+    provider/modello non tocca i call-site.
   - `intervista.py`: genera una domanda per criterio tarata sul contesto e
     parsa la risposta libera in `(livello, peso, motivazione, ambiguo)`. È il
     modello stesso a decidere se il criterio è risolto o se serve un altro
@@ -98,6 +103,11 @@ Il punteggio MCDA di un framework è la somma, su tutti i criteri, di
   `cicerone/db/connection.py` usa `cicerone/data/cicerone.sqlite` nel repo.
   Nel bundle desktop il launcher la imposta a una directory utente scrivibile
   (`~/Library/Application Support/Cicerone/`).
+- **`CICERONE_MODEL`** — override del modello LLM (stringa formato litellm, es.
+  `openai/gpt-4o`). Se assente, `cicerone/llm/_client.py` usa il default
+  `anthropic/claude-sonnet-4-6`. La chiave del provider è letta da litellm dalle
+  env var standard (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, ...) o passata
+  dall'override UI.
 - **`CICERONE_KNOWLEDGE_DIR`** — override della cartella della knowledge base.
   Se assente, `cicerone/llm/diagnostica.py` usa `knowledge/frameworks/` nel
   repo. Nel bundle il launcher la imposta alla cartella risolta al setup.

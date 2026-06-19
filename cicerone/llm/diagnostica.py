@@ -16,9 +16,8 @@ import os
 from pathlib import Path
 
 from cicerone.db import repository as repo
-from cicerone.llm._client import get_client
+from cicerone.llm._client import complete
 
-MODEL = "claude-haiku-4-5-20251001"
 MAX_DOMANDE = 5  # cap su domande "vere" (escluse re-ask)
 MIN_DOMANDE = 3
 MAX_RIASK = 3  # cap totale re-domande nella sessione, in ADDITION a MAX_DOMANDE
@@ -211,13 +210,11 @@ def next_question(
         framework_nome=framework["nomeFramework"] if framework else "Sconosciuto",
     )
 
-    resp = get_client().messages.create(
-        model=MODEL,
-        max_tokens=400,
+    testo = complete(
         system=system,
         messages=messages,
-    )
-    testo = resp.content[0].text.strip()
+        max_tokens=400,
+    ).strip()
 
     # 5. Check STOP
     if testo.upper().startswith("STOP") and n_non_riask >= MIN_DOMANDE:

@@ -9,6 +9,16 @@ progetto aderisce al [Versionamento Semantico](https://semver.org/lang/it/).
 
 ### Changed
 
+- **Layer LLM provider-agnostico (litellm)**: le chiamate ai modelli passano
+  ora per `litellm.completion()` tramite l'unico helper `complete()` in
+  `cicerone/llm/_client.py`. L'utente può usare la chiave del modello che
+  preferisce (Anthropic, OpenAI, Gemini, ...) indicando la stringa modello in
+  formato litellm. Un solo modello configurabile per tutti gli step (default
+  `anthropic/claude-sonnet-4-6`, override via campo UI o env `CICERONE_MODEL`).
+  Verifica chiave e UI di onboarding rese generiche (campo "Modello" + "API
+  Key", niente più riferimenti hardcoded ad Anthropic). Rimossi gli structured
+  outputs Anthropic-specifici nell'intervista; il parsing JSON difensivo
+  esistente resta a garanzia anti-crash.
 - **Redesign UI Streamlit in direzione SaaS**: restyle completo di `style.css`
   e dei singoli step (`onboarding`, `intervista`, `vincitore`, `report`),
   rimozione della chrome di default di Streamlit, logo e favicon brandizzati.

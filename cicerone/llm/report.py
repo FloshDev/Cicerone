@@ -5,11 +5,9 @@ knowledge base framework vincitore. Output: markdown completo pronto per
 download/distribuzione al cliente.
 """
 from cicerone.db import repository as repo
-from cicerone.llm._client import get_client
+from cicerone.llm._client import complete
 from cicerone.llm.diagnostica import _carica_framework_md
 from cicerone.mcda import calcolo
-
-MODEL = "claude-sonnet-4-6"  # Sonnet per qualità prosa report
 
 
 def _formatta_pesi(pesi: list[dict]) -> str:
@@ -147,10 +145,8 @@ Framework vincitore (oggetto del report): **{framework_nome}**
 Genera ora il report completo in markdown, seguendo la struttura esatta del
 system prompt (5 sezioni, niente riepilogo punteggi)."""
 
-    resp = get_client().messages.create(
-        model=MODEL,
-        max_tokens=4500,
+    return complete(
         system=system,
         messages=[{"role": "user", "content": user_prompt}],
+        max_tokens=4500,
     )
-    return resp.content[0].text

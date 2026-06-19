@@ -24,6 +24,7 @@ from cicerone.ui._pages._shared import (
     get_criteri,
     inject_style,
     set_api_key,
+    set_model,
 )
 from cicerone.ui._pages.diagnostica import pagina_diagnostica
 from cicerone.ui._pages.intervista import pagina_intervista
@@ -49,6 +50,7 @@ def init_state() -> None:
     st.session_state.setdefault("diag_domanda_corrente", None)
     st.session_state.setdefault("report_markdown", None)
     st.session_state.setdefault("api_key", "")
+    st.session_state.setdefault("model", "")
     st.session_state.setdefault("api_key_valida", None)
     st.session_state.setdefault("api_key_messaggio", "")
     st.session_state.setdefault("fasi_raggiunte", {"onboarding"})
@@ -202,6 +204,8 @@ def main() -> None:
 
     if st.session_state.api_key and st.session_state.api_key_valida:
         set_api_key(st.session_state.api_key)
+        if st.session_state.model:
+            set_model(st.session_state.model)
 
     step = st.session_state.step
     if step == "onboarding":

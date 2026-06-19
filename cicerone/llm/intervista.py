@@ -12,9 +12,7 @@ API:
 """
 import json
 
-from cicerone.llm._client import get_client
-
-MODEL = "claude-haiku-4-5-20251001"
+from cicerone.llm._client import complete
 
 LIVELLO_PESO = {
     "Fondamentale": 10.0,
@@ -23,26 +21,6 @@ LIVELLO_PESO = {
     "Poco importante": 2.5,
     "Non importante": 0.0,
 }
-
-# Schema structured-outputs per valuta_turno: forza il modello a emettere JSON
-# valido (niente più JSONDecodeError su virgolette/escape sbagliati). Schema
-# piatto e tutto-required (forma più sicura per i structured outputs Anthropic):
-# il modello compila sempre tutti i campi, quelli non pertinenti all'azione
-# scelta sono ignorati a valle.
-_SCHEMA_ESITO = {
-    "type": "object",
-    "properties": {
-        "azione": {"enum": ["chiudi", "approfondisci", "spiega"]},
-        "livello": {"enum": list(LIVELLO_PESO.keys())},
-        "motivazione": {"type": "string"},
-        "ambiguo": {"type": "boolean"},
-        "domanda": {"type": "string"},
-        "spiegazione": {"type": "string"},
-    },
-    "required": ["azione", "livello", "motivazione", "ambiguo", "domanda", "spiegazione"],
-    "additionalProperties": False,
-}
-
 
 def _contesto_str(contesto: dict | None) -> str:
     if not contesto:
@@ -73,13 +51,12 @@ Contesto azienda: {_contesto_str(contesto)}
 
 Genera la domanda."""
 
-    resp = get_client().messages.create(
-        model=MODEL,
-        max_tokens=200,
+    testo = complete(
         system=system,
         messages=[{"role": "user", "content": user}],
+        max_tokens=200,
     )
-    return resp.content[0].text.strip()
+    return testo.strip()
 
 
 def _strip_json_fence(testo: str) -> str:
@@ -176,19 +153,15 @@ Conversazione finora su questo criterio:
 
 Decidi l'azione e ritorna SOLO il JSON."""
 
-    resp = get_client().messages.create(
-        model=MODEL,
-        max_tokens=600,
+    raw = complete(
         system=system,
         messages=[{"role": "user", "content": user}],
-        output_config={"format": {"type": "json_schema", "schema": _SCHEMA_ESITO}},
-    )
+        max_tokens=600,
+    ) or ""
 
-    # Parsing difensivo: structured outputs garantisce JSON valido nel caso
-    # normale, ma refusal/troncamento possono comunque dare output non
-    # conforme. In quel caso degrada in una chiusura best-effort invece di
-    # propagare l'eccezione fino alla UI.
-    raw = resp.content[0].text if resp.content else ""
+    # Parsing difensivo: chiediamo JSON valido via prompt, ma refusal/troncamento
+    # possono comunque dare output non conforme. In quel caso degrada in una
+    # chiusura best-effort invece di propagare l'eccezione fino alla UI.
     try:
         parsed = json.loads(_strip_json_fence(raw))
         if not isinstance(parsed, dict):
