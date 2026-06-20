@@ -7,6 +7,8 @@ progetto aderisce al [Versionamento Semantico](https://semver.org/lang/it/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-20
+
 ### Fixed
 
 - **Ripristinata la terminologia "AI Readiness"** ovunque (codice, UI, docs,
@@ -17,7 +19,17 @@ progetto aderisce al [Versionamento Semantico](https://semver.org/lang/it/).
   (es. con sheet `rediness`) causava `ValueError: Sheet '...' non trovato`
   all'avvio dell'intervista. Ora `seed.run_if_needed()` rileva l'assenza dello
   sheet atteso e ricostruisce il DB ri-seedandolo.
-- Nuovo logo (`resources/branding/logo.png`) full-bleed e `icon.icns` rigenerato.
+- Nuovo logo (`resources/branding/logo.png`, squircle su sfondo trasparente) e
+  `icon.icns` rigenerato con padding nativo macOS (icona non più "incorniciata").
+
+### Packaging
+
+- **Bundle più snello (~38%)**: esclusi da PyInstaller `pyarrow` (~121M),
+  `pydeck` (~23M) e `altair` (~5.7M), importati da Streamlit solo per
+  dataframe/chart/mappe che l'app non usa. `.app` da ~318M a ~197M, `.dmg` da
+  ~128M a ~97M. Boot e flusso verificati senza regressioni.
+- `packaging/generate_icon.py`: genera l'icns dal logo trasparente con il
+  padding standard delle icone macOS (~82% del canvas).
 
 ## [0.2.0] - 2026-06-19
 

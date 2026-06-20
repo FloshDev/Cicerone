@@ -132,6 +132,13 @@ a = Analysis(
         "PySide6",
         "matplotlib",
         "numpy.f2py",
+        # Slim: l'app non usa dataframe/tabelle/chart/mappe Streamlit.
+        # pyarrow (~121M), pydeck (~23M), altair (~5.7M) sono importati
+        # da Streamlit solo lazy per quelle feature → esclusi. Streamlit
+        # degrada con messaggio se servissero, ma qui non vengono mai usati.
+        "pyarrow",
+        "pydeck",
+        "altair",
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -177,8 +184,8 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "Cicerone",
         "CFBundleDisplayName": "Cicerone",
-        "CFBundleShortVersionString": "0.2.0",
-        "CFBundleVersion": "0.2.0",
+        "CFBundleShortVersionString": "0.2.1",
+        "CFBundleVersion": "0.2.1",
         "LSUIElement": False,
         "NSHighResolutionCapable": True,
         "NSHumanReadableCopyright": "© 2026 Cicerone",

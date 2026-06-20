@@ -16,6 +16,11 @@ PROJECT_ROOT = ROOT.parent
 LOGO = PROJECT_ROOT / "resources" / "branding" / "logo.png"
 OUT_ICNS = ROOT / "icon.icns"
 
+# Frazione del canvas occupata dallo squircle. macOS usa una rounded-rect di
+# ~824px su 1024 (≈0.80); teniamo 0.82 per un margine trasparente coerente con
+# le app native senza far sembrare l'icona troppo piccola.
+ICON_SCALE = 0.82
+
 SIZES = [
     ("icon_16x16.png", 16),
     ("icon_16x16@2x.png", 32),
@@ -30,12 +35,35 @@ SIZES = [
 ]
 
 
+def _prepare_icon_master(src: Image.Image, canvas: int = 1024) -> Image.Image:
+    """Master 1024 RGBA stile icona macOS: squircle ritagliato sull'area opaca,
+    centrato su canvas trasparente a ICON_SCALE (margine trasparente per lato).
+
+    Il logo sorgente ha già lo sfondo trasparente (squircle isolato), quindi
+    basta ritagliare al contenuto e applicare il padding nativo."""
+    clean = src.convert("RGBA")
+    bbox = clean.getbbox()  # area opaca
+    if bbox:
+        clean = clean.crop(bbox)
+
+    target = int(round(canvas * ICON_SCALE))
+    cw, ch = clean.size
+    ratio = min(target / cw, target / ch)
+    new = (max(1, round(cw * ratio)), max(1, round(ch * ratio)))
+    clean = clean.resize(new, Image.LANCZOS)
+
+    master = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
+    off = ((canvas - new[0]) // 2, (canvas - new[1]) // 2)
+    master.paste(clean, off, clean)
+    return master
+
+
 def main() -> int:
     if not LOGO.exists():
         print(f"Manca {LOGO}")
         return 1
 
-    src = Image.open(LOGO).convert("RGBA")
+    src = _prepare_icon_master(Image.open(LOGO))
 
     with tempfile.TemporaryDirectory() as tmp:
         iconset = Path(tmp) / "Cicerone.iconset"
