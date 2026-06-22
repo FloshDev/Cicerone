@@ -87,10 +87,23 @@ def pagina_intervista() -> None:
         else:
             st.success(livello_label)
 
-    col_back, _ = st.columns([1, 5])
+    # "Avanti" è abilitato solo se il criterio successivo è già stato visitato
+    # (ha già una history): consente di tornare in avanti dopo un "Indietro"
+    # senza dover rispondere di nuovo.
+    prossimo_visitato = (
+        i < n - 1
+        and bool(chat_per_criterio.get(criteri[i + 1]["idCriterio"]))
+    )
+
+    col_back, col_fwd, _ = st.columns([1, 1, 4])
     with col_back:
         if st.button("← Indietro", disabled=(i == 0), key=f"back_{i}"):
             st.session_state.idx_criterio = max(0, i - 1)
+            st.session_state.intervista_domanda_corrente = None
+            st.rerun()
+    with col_fwd:
+        if st.button("Avanti →", disabled=not prossimo_visitato, key=f"fwd_{i}"):
+            st.session_state.idx_criterio = min(n - 1, i + 1)
             st.session_state.intervista_domanda_corrente = None
             st.rerun()
 
